@@ -15,7 +15,21 @@ const reportRoutes = require('./routes/reports');
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = [
+  'https://maralex-hospital.vercel.app',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+  'http://localhost:5173' // adjust/remove if you don't use a local dev server on this port
+];
+
+app.use(cors({
+  origin(origin, callback) {
+    // allow no-origin requests (curl, server-to-server, mobile apps)
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS: ' + origin));
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
