@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#4b7a22">
+<meta name="description" content="MARALEX Allied Pharmaceutical & Medical Inventory and Sales Management System">
+<link rel="icon" href="assets/maralex-logo.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>MARALEX Allied — Pharmaceutical & Medical Inventory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Playfair+Display:ital,wght@1,500;1,600;1,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<div class="login-wrap" id="loginScreen">
+  <div class="login-box">
+    <img class="login-logo" src="assets/maralex-logo.png" alt="MARALEX Allied logo">
+    <h2>MARALEX ALLIED</h2>
+    <p class="login-sub">Pharmaceutical &amp; Medical Inventory and Sales</p>
+    <div class="role-tabs">
+      <button type="button" class="role-tab active" data-role="Pharmacist" onclick="selectRole('Pharmacist')">Pharmacist</button>
+      <button type="button" class="role-tab" data-role="Supervisor" onclick="selectRole('Supervisor')">Supervisor</button>
+    </div>
+    <form id="loginForm">
+      <div class="field"><label>Username</label><input class="input" style="width:100%" id="lUser" required autocomplete="username"></div>
+      <div class="field"><label>Password</label><input class="input" style="width:100%" type="password" id="lPass" required autocomplete="current-password"></div>
+      <div class="login-error" id="loginError"></div>
+      <button class="btn primary" style="width:100%;margin-top:8px" id="loginBtn">Login</button>
+    </form>
+  </div>
+</div>
+
+<div class="app" id="appRoot" style="display:none">
+<aside class="sidebar">
+  <div class="brand"><img src="assets/maralex-logo.png" alt="MARALEX Allied logo"><h2>MARALEX ALLIED</h2><p>Hospital & Educational Services</p></div>
+  <nav class="nav">
+    <button class="active" data-page="dashboard"><span>▦</span><b>Dashboard</b></button>
+    <button data-page="inventory"><span>▤</span><b>Inventory</b></button>
+    <button data-page="sales"><span>₣</span><b>Sales / POS</b></button>
+    <button data-page="reports"><span>▥</span><b>Sales Reports</b></button>
+    <button data-page="suppliers"><span>♙</span><b>Suppliers</b></button>
+    <button data-page="customers"><span>♙</span><b>Patients / Customers</b></button>
+    <button data-page="stock"><span>↕</span><b>Stock Adjustments</b></button>
+    <button data-page="staff" id="navStaff" style="display:none"><span>⚕</span><b>Manage Staff</b></button>
+    <button data-page="profile"><span>◍</span><b>My Profile</b></button>
+  </nav>
+  <div class="side-bottom">MARALEX Allied • Live data</div>
+</aside>
+
+<main class="main">
+<header class="topbar"><h1 id="pageTitle">Dashboard</h1><div class="top-actions"><span class="pill" id="today"></span><div class="user-chip" id="userChip"></div><button class="btn secondary small" onclick="logout()">⏻ Logout</button></div></header>
+<div class="content">
+
+<section class="page active" id="dashboard">
+<div class="section-head"><div><h2>Inventory & Sales Overview</h2><p>Monitor medicines, medical supplies, stock levels and sales activity.</p></div><button class="btn primary" onclick="go('sales')">＋ New Sale</button></div>
+<div class="cards">
+ <div class="card"><span class="icon">▤</span><div class="label">Inventory Items</div><div class="metric" id="mItems">0</div><div class="delta">Active stock records</div></div>
+ <div class="card"><span class="icon">⚠</span><div class="label">Low Stock</div><div class="metric" id="mLow">0</div><div class="delta">Items needing attention</div></div>
+ <div class="card"><span class="icon">₣</span><div class="label">Today's Sales</div><div class="metric" id="mToday">Le 0</div><div class="delta">Current sales total</div></div>
+ <div class="card"><span class="icon">⌁</span><div class="label">Near Expiry</div><div class="metric" id="mExpiry">0</div><div class="delta">Within 90 days</div></div>
+</div>
+<div class="grid2">
+ <div class="panel"><h3>Sales — Last 7 Days</h3><div class="chart" id="chart"></div></div>
+ <div class="panel"><h3>Inventory Alerts</h3><div id="alerts"></div></div>
+</div>
+<div class="panel" style="margin-top:16px"><h3>Recent Sales</h3><div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th>Date</th><th>Customer / Patient</th><th>Items</th><th>Total</th><th>Status</th></tr></thead><tbody id="recentSales"></tbody></table></div></div>
+</section>
+
+<section class="page" id="inventory">
+<div class="section-head"><div><h2>Pharmaceutical & Medical Inventory</h2><p>All sales are linked to available inventory quantities.</p></div><button class="btn primary" onclick="openProductModal()">＋ Add Item</button></div>
+<div class="toolbar"><input class="input" id="invSearch" placeholder="Search item, SKU or category..." oninput="renderInventory()"><select class="select" id="invCat" onchange="renderInventory()"><option value="">All categories</option><option>Medicines</option><option>Medical Supplies</option><option>Laboratory</option><option>Equipment</option></select><select class="select" id="invStatus" onchange="renderInventory()"><option value="">All stock status</option><option value="ok">In stock</option><option value="low">Low stock</option><option value="out">Out of stock</option><option value="expired">Expired</option></select></div>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>SKU</th><th>Item</th><th>Category</th><th>Batch</th><th>Expiry</th><th>Qty</th><th>Reorder</th><th>Cost</th><th>Sale Price</th><th>Status</th><th>Action</th></tr></thead><tbody id="inventoryBody"></tbody></table></div></div>
+</section>
+
+<section class="page" id="sales">
+<div class="section-head"><div><h2>Sales / Point of Sale</h2><p>Select inventory items to build a sale, linked to live stock.</p></div></div>
+<div class="pos">
+<div><div class="toolbar"><input class="input" id="posSearch" placeholder="Search inventory..." oninput="renderPOS()"><select class="select" id="posCat" onchange="renderPOS()"><option value="">All categories</option><option>Medicines</option><option>Medical Supplies</option><option>Laboratory</option><option>Equipment</option></select></div><div class="product-grid" id="productGrid"></div></div>
+<div class="panel cart"><h3>Current Sale</h3><div class="field"><label>Patient / Customer</label><input class="input" id="saleCustomer" placeholder="Walk-in Patient" style="width:100%"></div><div id="cart"></div><div class="total"><span>Total</span><span id="cartTotal">Le 0</span></div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn secondary" style="flex:1" onclick="clearCart()">Clear</button><button class="btn primary" style="flex:2" onclick="checkout()">Complete Sale</button></div></div>
+</div>
+</section>
+
+<section class="page" id="reports">
+<div class="section-head"><div><h2>Sales Reports</h2><p>View daily, weekly, monthly or yearly sales and generate a PDF report.</p></div><button class="btn blue" onclick="downloadPDF()">⇩ Download PDF</button></div>
+<div class="toolbar"><select class="select" id="reportPeriod" onchange="renderReports()"><option value="daily">Daily</option><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select><input class="input" type="date" id="reportDate" onchange="renderReports()"></div>
+<div class="report-cards"><div class="report-card"><h4>Sales Total</h4><p id="rTotal">Le 0</p></div><div class="report-card"><h4>Transactions</h4><p id="rTx">0</p></div><div class="report-card"><h4>Units Sold</h4><p id="rUnits">0</p></div><div class="report-card"><h4>Average Sale</h4><p id="rAvg">Le 0</p></div></div>
+<div class="panel"><h3 id="reportHeading">Weekly Sales</h3><div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th>Date</th><th>Customer / Patient</th><th>Items</th><th>Total</th></tr></thead><tbody id="reportBody"></tbody></table></div></div>
+</section>
+
+<section class="page" id="suppliers">
+<div class="section-head"><div><h2>Suppliers</h2><p>Manage pharmaceutical, laboratory and medical supply sources.</p></div><button class="btn primary" onclick="openSupplierModal()">＋ Add Supplier</button></div>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Supplier</th><th>Contact</th><th>Phone</th><th>Products</th><th>Status</th></tr></thead><tbody id="supplierBody"></tbody></table></div></div>
+</section>
+
+<section class="page" id="customers">
+<div class="section-head"><div><h2>Patients / Customers</h2><p>Simple sales-linked customer records. No email field is used.</p></div><button class="btn primary" onclick="openCustomerModal()">＋ Add Customer</button></div>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Phone</th><th>Type</th><th>Total Purchases</th><th>Last Visit</th></tr></thead><tbody id="customerBody"></tbody></table></div></div>
+</section>
+
+<section class="page" id="stock">
+<div class="section-head"><div><h2>Stock Adjustments</h2><p>Record received stock, damaged items and manual corrections.</p></div><button class="btn primary" onclick="openAdjustModal()">＋ Adjust Stock</button></div>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Item</th><th>Type</th><th>Quantity</th><th>Reason</th></tr></thead><tbody id="adjustBody"></tbody></table></div></div>
+</section>
+
+<section class="page" id="staff">
+<div class="section-head"><div><h2>Manage Staff</h2><p>Create and manage Pharmacist and Supervisor login accounts.</p></div><button class="btn primary" onclick="openStaffModal()">＋ Add Staff</button></div>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Phone</th><th>Action</th></tr></thead><tbody id="staffBody"></tbody></table></div></div>
+</section>
+
+<section class="page" id="profile">
+<div class="section-head"><div><h2>My Profile</h2><p>View and update your own account details and password.</p></div></div>
+<div class="grid2">
+<div class="panel">
+<h3>Account Details</h3>
+<form id="profileForm">
+<div class="form-grid">
+<div class="field"><label>Full Name</label><input class="input" id="pfName" required></div>
+<div class="field"><label>Username</label><input class="input" id="pfUser" required></div>
+<div class="field"><label>Phone</label><input class="input" id="pfPhone"></div>
+<div class="field"><label>Role</label><input class="input" id="pfRole" disabled></div>
+</div>
+<button class="btn primary" style="margin-top:16px">Save Changes</button>
+</form>
+</div>
+<div class="panel">
+<h3>Change Password</h3>
+<form id="passwordForm">
+<div class="form-grid">
+<div class="field"><label>Current Password</label><input class="input" type="password" id="pfCurPass" required></div>
+<div class="field"><label>New Password</label><input class="input" type="password" id="pfNewPass" required minlength="6"></div>
+<div class="field"><label>Confirm New Password</label><input class="input" type="password" id="pfConfPass" required minlength="6"></div>
+</div>
+<button class="btn primary" style="margin-top:16px">Update Password</button>
+</form>
+<div class="danger-zone">
+<h3>Danger Zone</h3>
+<p style="font-size:11px;color:var(--muted);margin:0 0 10px">Deleting your account permanently removes your login access.</p>
+<button class="btn danger" onclick="deleteAccount()" type="button">Delete My Account</button>
+</div>
+</div>
+</div>
+</section>
+</div></main>
+</div>
+
+<div class="modal" id="productModal"><div class="modal-box"><div class="modal-head"><h3>Add Inventory Item</h3><button class="x" onclick="closeModal('productModal')">×</button></div><form id="productForm"><div class="form-grid">
+<div class="field"><label>Item Name</label><input class="input" id="pName" required></div><div class="field"><label>SKU</label><input class="input" id="pSku" required></div><div class="field"><label>Category</label><select class="select" id="pCat"><option>Medicines</option><option>Medical Supplies</option><option>Laboratory</option><option>Equipment</option></select></div>
+<div class="field"><label>Batch Number</label><input class="input" id="pBatch" required></div><div class="field"><label>Expiry Date</label><input class="input" type="date" id="pExpiry" required></div><div class="field"><label>Quantity</label><input class="input" type="number" id="pQty" min="0" required></div>
+<div class="field"><label>Reorder Level</label><input class="input" type="number" id="pReorder" min="0" value="10"></div><div class="field"><label>Cost Price (Le)</label><input class="input" type="number" id="pCost" min="0" required></div><div class="field"><label>Sale Price (Le)</label><input class="input" type="number" id="pPrice" min="0" required></div>
+</div><button class="btn primary" style="margin-top:16px">Save Item</button></form></div></div>
+
+<div class="modal" id="supplierModal"><div class="modal-box"><div class="modal-head"><h3>Add Supplier</h3><button class="x" onclick="closeModal('supplierModal')">×</button></div><form id="supplierForm"><div class="form-grid"><div class="field"><label>Supplier Name</label><input class="input" id="sName" required></div><div class="field"><label>Contact Person</label><input class="input" id="sContact" required></div><div class="field"><label>Phone</label><input class="input" id="sPhone" required></div></div><button class="btn primary" style="margin-top:16px">Save Supplier</button></form></div></div>
+
+<div class="modal" id="customerModal"><div class="modal-box"><div class="modal-head"><h3>Add Patient / Customer</h3><button class="x" onclick="closeModal('customerModal')">×</button></div><form id="customerForm"><div class="form-grid"><div class="field"><label>Name</label><input class="input" id="cName" required></div><div class="field"><label>Phone</label><input class="input" id="cPhone" required></div><div class="field"><label>Type</label><select class="select" id="cType"><option>Patient</option><option>Walk-in Customer</option><option>Clinic / Department</option></select></div></div><button class="btn primary" style="margin-top:16px">Save Customer</button></form></div></div>
+
+<div class="modal" id="adjustModal"><div class="modal-box"><div class="modal-head"><h3>Stock Adjustment</h3><button class="x" onclick="closeModal('adjustModal')">×</button></div><form id="adjustForm"><div class="form-grid"><div class="field"><label>Item</label><select class="select" id="aItem" required></select></div><div class="field"><label>Adjustment Type</label><select class="select" id="aType"><option value="Received">Received / Added</option><option value="Damaged">Damaged / Removed</option><option value="Correction">Correction / Added</option></select></div><div class="field"><label>Quantity</label><input class="input" type="number" id="aQty" min="1" required></div><div class="field"><label>Reason</label><input class="input" id="aReason" required></div></div><button class="btn primary" style="margin-top:16px">Save Adjustment</button></form></div></div>
+
+<div class="modal" id="staffModal"><div class="modal-box"><div class="modal-head"><h3 id="staffModalTitle">Add Staff</h3><button class="x" onclick="closeModal('staffModal')">×</button></div><form id="staffForm"><input type="hidden" id="stId"><div class="form-grid"><div class="field"><label>Full Name</label><input class="input" id="stName" required></div><div class="field"><label>Username</label><input class="input" id="stUser" required></div><div class="field"><label>Role</label><select class="select" id="stRole"><option>Pharmacist</option><option>Supervisor</option></select></div><div class="field"><label>Phone</label><input class="input" id="stPhone"></div><div class="field"><label>Password</label><input class="input" type="password" id="stPass" placeholder="Leave blank to keep unchanged"></div></div><button class="btn primary" style="margin-top:16px">Save Staff</button></form></div></div>
+
+<div id="toastHost"></div>
+
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
