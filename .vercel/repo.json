@@ -1,0 +1,11 @@
+{
+  "remoteName": "origin",
+  "projects": [
+    {
+      "id": "prj_oX3DPrTwds7o6aXfvniPBqWUBwrY",
+      "name": "maralex-hospital",
+      "directory": ".",
+      "orgId": "team_6FRw8ruyYAdSBaAwsZJgxIFM"
+    }
+  ]
+}

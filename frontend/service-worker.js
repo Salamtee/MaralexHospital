@@ -1,4 +1,4 @@
-const CACHE_NAME = 'maralex-allied-shell-v1';
+const CACHE_NAME = 'maralex-allied-shell-v2';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -32,8 +32,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // App shell: cache-first, falling back to network.
+  // App shell: network-first, falling back to cache only when offline.
+  // (Previously cache-first, which kept serving a stale js/api.js to the
+  // installed PWA even after new versions were deployed to Vercel.)
   event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request).catch(() => caches.match('/index.html')))
+    fetch(request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        return response;
+      })
+      .catch(() => caches.match(request).then((cached) => cached || caches.match('/index.html')))
   );
 });
