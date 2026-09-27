@@ -290,8 +290,8 @@ async function renderReports() {
   document.getElementById('rAvg').textContent = fmt(r.average);
   document.getElementById('reportHeading').textContent = period[0].toUpperCase() + period.slice(1) + ' Sales Report';
   document.getElementById('reportBody').innerHTML = r.sales.length
-    ? r.sales.map((s) => `<tr><td>${s.invoice}</td><td>${s.date}</td><td>${s.customer}</td><td>${s.units}</td><td>${fmt(s.total)}</td></tr>`).join('')
-    : '<tr><td colspan="5" class="empty">No sales found for this period.</td></tr>';
+    ? r.sales.map((s) => `<tr><td>${s.invoice}</td><td>${s.date}</td><td>${s.customer}</td><td>${s.itemsText}</td><td>${s.units}</td><td>${fmt(s.total)}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No sales found for this period.</td></tr>';
 }
 
 async function downloadPDF() {
@@ -311,25 +311,35 @@ async function downloadPDF() {
   doc.text('Pharmaceutical & Medical Inventory and Sales', 20, 33);
   doc.text(`${period.toUpperCase()} SALES REPORT — ${date}`, 20, 43);
 
+  const col = { invoice: 14, date: 34, customer: 56, items: 100, units: 172, total: 184 };
+  const itemsColWidth = col.units - col.items - 2;
+
   let y = 55;
   doc.setFontSize(9);
-  doc.text('Invoice', 20, y);
-  doc.text('Date', 50, y);
-  doc.text('Customer / Patient', 78, y);
-  doc.text('Items', 145, y);
-  doc.text('Total', 170, y);
-  y += 7;
+  doc.setFont(undefined, 'bold');
+  doc.text('Invoice', col.invoice, y);
+  doc.text('Date', col.date, y);
+  doc.text('Customer / Patient', col.customer, y);
+  doc.text('Item(s) Sold', col.items, y);
+  doc.text('Units', col.units, y);
+  doc.text('Total', col.total, y);
+  doc.setFont(undefined, 'normal');
+  y += 6;
+
   r.sales.forEach((s) => {
-    if (y > 280) {
+    const itemLines = doc.splitTextToSize(s.itemsText || '-', itemsColWidth);
+    const rowHeight = Math.max(6, itemLines.length * 4.5);
+    if (y + rowHeight > 280) {
       doc.addPage();
       y = 20;
     }
-    doc.text(s.invoice, 20, y);
-    doc.text(s.date, 50, y);
-    doc.text(String(s.customer).slice(0, 30), 78, y);
-    doc.text(String(s.units), 145, y);
-    doc.text(fmt(s.total), 170, y);
-    y += 6;
+    doc.text(s.invoice, col.invoice, y);
+    doc.text(s.date, col.date, y);
+    doc.text(String(s.customer).slice(0, 22), col.customer, y);
+    doc.text(itemLines, col.items, y);
+    doc.text(String(s.units), col.units, y);
+    doc.text(fmt(s.total), col.total, y);
+    y += rowHeight;
   });
   doc.setFontSize(11);
   doc.text(`Total Sales: ${fmt(r.total)}`, 20, y + 8);

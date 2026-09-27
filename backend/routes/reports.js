@@ -91,6 +91,8 @@ router.get('/sales', async (req, res) => {
       invoice: s.invoice,
       date: s.date,
       customer: s.customer,
+      items: s.items.map((i) => ({ name: i.name, qty: i.qty, price: i.price, total: i.total })),
+      itemsText: s.items.map((i) => `${i.name} x${i.qty}`).join(', '),
       units: s.items.reduce((a, i) => a + i.qty, 0),
       total: s.total
     }))

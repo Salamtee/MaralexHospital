@@ -64,4 +64,16 @@ connectDB().then(() => {
     console.log(`MARALEX Allied API running on port ${PORT}`);
     console.log(`\n  Open this in your browser:  http://localhost:${PORT}\n`);
   });
+
+  // Keep-alive: Render's free tier spins the service down after ~15 minutes
+  // with no incoming requests. Pinging our own public health endpoint every
+  // 10 minutes keeps the instance counted as active. Render sets
+  // RENDER_EXTERNAL_URL automatically; the literal URL below is a fallback
+  // for running this same code elsewhere.
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL || 'https://maralexhospital.onrender.com';
+  setInterval(() => {
+    fetch(`${SELF_URL}/api/health`)
+      .then((r) => console.log(`[keep-alive] ping ${r.status}`))
+      .catch((err) => console.error('[keep-alive] ping failed:', err.message));
+  }, 10 * 60 * 1000);
 });

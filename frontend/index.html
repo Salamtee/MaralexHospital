@@ -88,7 +88,7 @@
 <div class="section-head"><div><h2>Sales Reports</h2><p>View daily, weekly, monthly or yearly sales and generate a PDF report.</p></div><button class="btn blue" onclick="downloadPDF()">⇩ Download PDF</button></div>
 <div class="toolbar"><select class="select" id="reportPeriod" onchange="renderReports()"><option value="daily">Daily</option><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select><input class="input" type="date" id="reportDate" onchange="renderReports()"></div>
 <div class="report-cards"><div class="report-card"><h4>Sales Total</h4><p id="rTotal">Le 0</p></div><div class="report-card"><h4>Transactions</h4><p id="rTx">0</p></div><div class="report-card"><h4>Units Sold</h4><p id="rUnits">0</p></div><div class="report-card"><h4>Average Sale</h4><p id="rAvg">Le 0</p></div></div>
-<div class="panel"><h3 id="reportHeading">Weekly Sales</h3><div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th>Date</th><th>Customer / Patient</th><th>Items</th><th>Total</th></tr></thead><tbody id="reportBody"></tbody></table></div></div>
+<div class="panel"><h3 id="reportHeading">Weekly Sales</h3><div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th>Date</th><th>Customer / Patient</th><th>Item(s) Sold</th><th>Units</th><th>Total</th></tr></thead><tbody id="reportBody"></tbody></table></div></div>
 </section>
 
 <section class="page" id="suppliers">
