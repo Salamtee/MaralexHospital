@@ -29,4 +29,17 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { requireAuth, requireRole };
+/**
+ * Owner is view-only: block every write method.
+ * Apply after requireAuth on mutating routes, or use as app-level guard.
+ */
+function requireWrite(req, res, next) {
+  if (req.user && req.user.role === 'Owner') {
+    return res.status(403).json({
+      message: 'Owner accounts are view-only. You cannot create, edit or delete records.'
+    });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireRole, requireWrite };

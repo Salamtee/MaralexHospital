@@ -1,7 +1,8 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireWrite } = require('../middleware/auth');
+const { upload } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -11,22 +12,25 @@ function signToken(user) {
   });
 }
 
-// POST /api/auth/login  { username, password, role }
+// POST /api/auth/login  { phone, password, role }
 router.post('/login', async (req, res) => {
   try {
-    const { username, password, role } = req.body;
-    if (!username || !password || !role) {
-      return res.status(400).json({ message: 'Username, password and role are required.' });
+    const { phone, password, role, username } = req.body;
+    // Accept phone (preferred) or legacy username field mapped to phone
+    const rawPhone = phone || username;
+    if (!rawPhone || !password || !role) {
+      return res.status(400).json({ message: 'Phone number, password and role are required.' });
     }
 
-    const user = await User.findOne({ username: username.trim().toLowerCase(), role });
+    const normalized = User.normalizePhone(rawPhone);
+    const user = await User.findOne({ phone: normalized, role });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid username, password or role selected.' });
+      return res.status(401).json({ message: 'Invalid phone number, password or role selected.' });
     }
 
     const match = await user.comparePassword(password);
     if (!match) {
-      return res.status(401).json({ message: 'Invalid username, password or role selected.' });
+      return res.status(401).json({ message: 'Invalid phone number, password or role selected.' });
     }
 
     const token = signToken(user);
@@ -42,18 +46,19 @@ router.get('/me', requireAuth, (req, res) => {
 });
 
 // PUT /api/auth/profile — update own name/username/phone
-router.put('/profile', requireAuth, async (req, res) => {
+router.put('/profile', requireAuth, requireWrite, async (req, res) => {
   try {
-    const { name, username, phone } = req.body;
-    const dupe = await User.findOne({
-      _id: { $ne: req.user._id },
-      username: (username || '').trim().toLowerCase()
-    });
-    if (dupe) return res.status(409).json({ message: 'That username is already taken.' });
-
-    req.user.name = (name || req.user.name).trim();
-    req.user.username = (username || req.user.username).trim().toLowerCase();
-    req.user.phone = phone !== undefined ? phone.trim() : req.user.phone;
+    const { name, phone } = req.body;
+    if (phone !== undefined && phone !== null && String(phone).trim()) {
+      const normalized = User.normalizePhone(phone);
+      const dupe = await User.findOne({
+        _id: { $ne: req.user._id },
+        phone: normalized
+      });
+      if (dupe) return res.status(409).json({ message: 'That phone number is already registered.' });
+      req.user.phone = normalized;
+    }
+    if (name) req.user.name = name.trim();
     await req.user.save();
     res.json({ user: req.user.toSafeObject() });
   } catch (err) {
@@ -62,7 +67,7 @@ router.put('/profile', requireAuth, async (req, res) => {
 });
 
 // PUT /api/auth/password — change own password
-router.put('/password', requireAuth, async (req, res) => {
+router.put('/password', requireAuth, requireWrite, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const match = await req.user.comparePassword(currentPassword || '');
@@ -79,7 +84,7 @@ router.put('/password', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/auth/me — delete own account
-router.delete('/me', requireAuth, async (req, res) => {
+router.delete('/me', requireAuth, requireWrite, async (req, res) => {
   try {
     await User.findByIdAndDelete(req.user._id);
     res.json({ message: 'Account deleted.' });
@@ -88,4 +93,18 @@ router.delete('/me', requireAuth, async (req, res) => {
   }
 });
 
+
+// POST /api/auth/avatar — upload profile image
+router.post('/avatar', requireAuth, requireWrite, upload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'Choose an image file.' });
+    req.user.avatar = req.file.filename;
+    await req.user.save();
+    res.json({ user: req.user.toSafeObject() });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not upload avatar.', error: err.message });
+  }
+});
+
 module.exports = router;
+

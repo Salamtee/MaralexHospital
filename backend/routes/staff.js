@@ -11,43 +11,67 @@ router.get('/', async (req, res) => {
   res.json(staff.map((u) => u.toSafeObject()));
 });
 
-// POST /api/staff — create a new Pharmacist or Supervisor account
+// POST /api/staff — create Pharmacist or Supervisor (login = phone + password)
 router.post('/', async (req, res) => {
   try {
-    const { name, username, role, phone, password } = req.body;
-    if (!name || !username || !role) {
-      return res.status(400).json({ message: 'Name, username and role are required.' });
+    const { name, role, phone, password, username } = req.body;
+    if (!name || !role || !phone) {
+      return res.status(400).json({ message: 'Name, phone number and role are required.' });
     }
-    const dupe = await User.findOne({ username: username.trim().toLowerCase() });
-    if (dupe) return res.status(409).json({ message: 'That username is already taken.' });
+    if (!['Pharmacist', 'Supervisor'].includes(role)) {
+      return res.status(400).json({
+        message: 'Staff role must be Pharmacist or Supervisor. Owner accounts are seeded only.'
+      });
+    }
+
+    const normalized = User.normalizePhone(phone);
+    if (!normalized || normalized.replace(/\D/g, '').length < 7) {
+      return res.status(400).json({ message: 'Enter a valid phone number.' });
+    }
+
+    const dupe = await User.findOne({ phone: normalized });
+    if (dupe) return res.status(409).json({ message: 'That phone number is already registered.' });
 
     const user = await User.create({
       name: name.trim(),
-      username: username.trim().toLowerCase(),
+      username: (username || normalized).toString().trim().toLowerCase().replace(/[^\w]/g, '') || normalized,
       role,
-      phone: (phone || '').trim(),
+      phone: normalized,
       password: password || 'Change@123'
     });
     res.status(201).json(user.toSafeObject());
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ message: 'That phone number is already registered.' });
+    }
     res.status(500).json({ message: 'Could not create staff account.', error: err.message });
   }
 });
 
-// PUT /api/staff/:id — edit a staff account
+// PUT /api/staff/:id
 router.put('/:id', async (req, res) => {
   try {
-    const { name, username, role, phone, password } = req.body;
-    const dupe = await User.findOne({ _id: { $ne: req.params.id }, username: (username || '').trim().toLowerCase() });
-    if (dupe) return res.status(409).json({ message: 'That username is already taken.' });
-
+    const { name, role, phone, password } = req.body;
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'Staff account not found.' });
 
+    if (user.role === 'Owner') {
+      return res.status(403).json({ message: 'Owner accounts cannot be changed here.' });
+    }
+
     if (name) user.name = name.trim();
-    if (username) user.username = username.trim().toLowerCase();
-    if (role) user.role = role;
-    if (phone !== undefined) user.phone = phone.trim();
+    if (role) {
+      if (!['Pharmacist', 'Supervisor'].includes(role)) {
+        return res.status(400).json({ message: 'Staff role must be Pharmacist or Supervisor.' });
+      }
+      user.role = role;
+    }
+    if (phone !== undefined && phone !== null && String(phone).trim()) {
+      const normalized = User.normalizePhone(phone);
+      const dupe = await User.findOne({ _id: { $ne: user._id }, phone: normalized });
+      if (dupe) return res.status(409).json({ message: 'That phone number is already registered.' });
+      user.phone = normalized;
+    }
     if (password) user.password = password;
     await user.save();
     res.json(user.toSafeObject());
@@ -60,11 +84,15 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     if (req.params.id === String(req.user._id)) {
-      return res.status(400).json({ message: "You can't delete your own account here — use My Profile instead." });
+      return res.status(400).json({
+        message: "You can't delete your own account here — use My Profile instead."
+      });
     }
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ message: 'Staff account not found.' });
-
+    if (target.role === 'Owner') {
+      return res.status(403).json({ message: 'Owner accounts cannot be deleted here.' });
+    }
     if (target.role === 'Supervisor') {
       const supervisorCount = await User.countDocuments({ role: 'Supervisor' });
       if (supervisorCount <= 1) {

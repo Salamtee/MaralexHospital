@@ -1,9 +1,13 @@
 const express = require('express');
 const Supplier = require('../models/Supplier');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireWrite } = require('../middleware/auth');
 
 const router = express.Router();
 router.use(requireAuth);
+router.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  return requireWrite(req, res, next);
+});
 
 router.get('/', async (req, res) => {
   const suppliers = await Supplier.find().sort({ createdAt: 1 });

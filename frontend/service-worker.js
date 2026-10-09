@@ -1,4 +1,4 @@
-const CACHE_NAME = 'maralex-allied-shell-v2';
+const CACHE_NAME = 'maralex-allied-shell-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -26,15 +26,19 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // Never cache API calls — the app always needs live data from MongoDB.
   if (request.url.includes('/api/')) {
-    event.respondWith(fetch(request).catch(() => new Response(JSON.stringify({ message: 'You appear to be offline.' }), { headers: { 'Content-Type': 'application/json' }, status: 503 })));
+    event.respondWith(
+      fetch(request).catch(
+        () =>
+          new Response(JSON.stringify({ message: 'You appear to be offline.' }), {
+            headers: { 'Content-Type': 'application/json' },
+            status: 503
+          })
+      )
+    );
     return;
   }
 
-  // App shell: network-first, falling back to cache only when offline.
-  // (Previously cache-first, which kept serving a stale js/api.js to the
-  // installed PWA even after new versions were deployed to Vercel.)
   event.respondWith(
     fetch(request)
       .then((response) => {
@@ -43,5 +47,45 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => caches.match(request).then((cached) => cached || caches.match('/index.html')))
+  );
+});
+
+// Push notifications (works when app is closed if user subscribed)
+self.addEventListener('push', (event) => {
+  let data = { title: 'MARALEX Allied', body: 'You have a new update.', url: '/', tag: 'maralex' };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch (e) {
+    try {
+      data.body = event.data.text();
+    } catch (_) {}
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'MARALEX Allied', {
+      body: data.body || '',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: data.tag || 'maralex',
+      data: { url: data.url || '/' },
+      requireInteraction: false
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.focus();
+          if (client.navigate) client.navigate(url);
+          return;
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
   );
 });

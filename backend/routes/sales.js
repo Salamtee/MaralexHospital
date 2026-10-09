@@ -2,10 +2,15 @@ const express = require('express');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireWrite } = require('../middleware/auth');
+const { notifySupervisorsAndOwners } = require('../utils/notify');
 
 const router = express.Router();
 router.use(requireAuth);
+router.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  return requireWrite(req, res, next);
+});
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -67,6 +72,26 @@ router.post('/checkout', async (req, res) => {
       await existing.save();
     } else {
       await Customer.create({ name: customerName, phone: '—', type: 'Patient', purchases: total, last: todayISO() });
+    }
+
+    notifySupervisorsAndOwners({
+      title: 'New sale completed',
+      body: `Invoice ${sale.invoice} · ${sale.customer} · Le ${Number(sale.total || 0).toLocaleString()}`,
+      url: '/?page=reports',
+      tag: 'sale-' + sale._id
+    }).catch(() => {});
+
+    // Low stock check after sale
+    for (const item of saleItems) {
+      const p = await Product.findById(item.product);
+      if (p && p.qty <= p.reorder) {
+        notifySupervisorsAndOwners({
+          title: 'Low stock after sale',
+          body: `${p.name} (${p.sku}) — only ${p.qty} left`,
+          url: '/?page=inventory',
+          tag: 'low-' + p._id
+        }).catch(() => {});
+      }
     }
 
     res.status(201).json(sale);

@@ -3,6 +3,7 @@ const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const { initVapid } = require('./utils/notify');
 
 const authRoutes = require('./routes/auth');
 const staffRoutes = require('./routes/staff');
@@ -12,6 +13,13 @@ const supplierRoutes = require('./routes/suppliers');
 const customerRoutes = require('./routes/customers');
 const adjustmentRoutes = require('./routes/adjustments');
 const reportRoutes = require('./routes/reports');
+const bankRoutes = require('./routes/bank');
+const purchaseRoutes = require('./routes/purchases');
+const expenseRoutes = require('./routes/expenses');
+const prescriptionRoutes = require('./routes/prescriptions');
+const auditRoutes = require('./routes/audit');
+const treatmentRoutes = require('./routes/treatments');
+const pushRoutes = require('./routes/push');
 
 const app = express();
 
@@ -40,12 +48,20 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/adjustments', adjustmentRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/bank', bankRoutes);
+app.use('/api/purchases', purchaseRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/prescriptions', prescriptionRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/treatments', treatmentRoutes);
+app.use('/api/push', pushRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Serve the frontend (HTML/CSS/JS/PWA files) from ../frontend
 const frontendDir = path.join(__dirname, '..', 'frontend');
 app.use(express.static(frontendDir));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
   res.sendFile(path.join(frontendDir, 'index.html'));
@@ -60,6 +76,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {
+  try { initVapid(); } catch (e) { console.warn('[vapid]', e.message); }
   app.listen(PORT, () => {
     console.log(`MARALEX Allied API running on port ${PORT}`);
     console.log(`\n  Open this in your browser:  http://localhost:${PORT}\n`);

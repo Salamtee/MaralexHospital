@@ -1,10 +1,14 @@
 const express = require('express');
 const Adjustment = require('../models/Adjustment');
 const Product = require('../models/Product');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireWrite } = require('../middleware/auth');
 
 const router = express.Router();
 router.use(requireAuth);
+router.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  return requireWrite(req, res, next);
+});
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
