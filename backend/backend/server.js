@@ -1,0 +1,96 @@
+require('dotenv').config();
+const path = require('path');
+const express = require('express');
+const cors = require('cors');
+const connectDB = require('./config/db');
+const { initVapid } = require('./utils/notify');
+
+const authRoutes = require('./routes/auth');
+const staffRoutes = require('./routes/staff');
+const productRoutes = require('./routes/products');
+const saleRoutes = require('./routes/sales');
+const supplierRoutes = require('./routes/suppliers');
+const customerRoutes = require('./routes/customers');
+const adjustmentRoutes = require('./routes/adjustments');
+const reportRoutes = require('./routes/reports');
+const bankRoutes = require('./routes/bank');
+const purchaseRoutes = require('./routes/purchases');
+const expenseRoutes = require('./routes/expenses');
+const prescriptionRoutes = require('./routes/prescriptions');
+const auditRoutes = require('./routes/audit');
+const treatmentRoutes = require('./routes/treatments');
+const pushRoutes = require('./routes/push');
+
+const app = express();
+
+const allowedOrigins = [
+  'https://maralex-hospital.vercel.app',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+  'http://localhost:5173' // adjust/remove if you don't use a local dev server on this port
+];
+
+app.use(cors({
+  origin(origin, callback) {
+    // allow no-origin requests (curl, server-to-server, mobile apps)
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS: ' + origin));
+  },
+  credentials: true
+}));
+app.use(express.json());
+
+app.use('/api/auth', authRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/sales', saleRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/adjustments', adjustmentRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/bank', bankRoutes);
+app.use('/api/purchases', purchaseRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/prescriptions', prescriptionRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/treatments', treatmentRoutes);
+app.use('/api/push', pushRoutes);
+
+app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// Serve the frontend (HTML/CSS/JS/PWA files) from ../frontend
+const frontendDir = path.join(__dirname, '..', 'frontend');
+app.use(express.static(frontendDir));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  res.sendFile(path.join(frontendDir, 'index.html'));
+});
+
+// Central error handler
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ message: 'Server error.' });
+});
+
+const PORT = process.env.PORT || 5000;
+
+connectDB().then(() => {
+  try { initVapid(); } catch (e) { console.warn('[vapid]', e.message); }
+  app.listen(PORT, () => {
+    console.log(`MARALEX Allied API running on port ${PORT}`);
+    console.log(`\n  Open this in your browser:  http://localhost:${PORT}\n`);
+  });
+
+  // Keep-alive: Render's free tier spins the service down after ~15 minutes
+  // with no incoming requests. Pinging our own public health endpoint every
+  // 10 minutes keeps the instance counted as active. Render sets
+  // RENDER_EXTERNAL_URL automatically; the literal URL below is a fallback
+  // for running this same code elsewhere.
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL || 'https://maralexhospital.onrender.com';
+  setInterval(() => {
+    fetch(`${SELF_URL}/api/health`)
+      .then((r) => console.log(`[keep-alive] ping ${r.status}`))
+      .catch((err) => console.error('[keep-alive] ping failed:', err.message));
+  }, 10 * 60 * 1000);
+});

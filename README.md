@@ -49,10 +49,11 @@ npm run seed
 
 This creates:
 
-| Role       | Username     | Password    |
-|------------|--------------|-------------|
-| Pharmacist | `pharmacist` | `Pharm@123` |
-| Supervisor | `supervisor` | `Super@123` |
+| Role       | Phone (login) | Password    | Access |
+|------------|---------------|-------------|--------|
+| Pharmacist | `0760000001`  | `Pharm@123` | Full work |
+| Supervisor | `0760000002`  | `Super@123` | Full work + Manage Staff |
+| Owner      | `0760000003`  | `Owner@123` | **View-only** (cannot create/edit/delete) |
 
 **Change both passwords after your first login** (My Profile → Change
 Password). Running `npm run seed` again is safe — it skips accounts that
@@ -113,11 +114,31 @@ maralex-system/
 
 ## Roles
 
-- **Pharmacist** — dashboard, inventory, sales/POS, reports, suppliers,
-  customers, stock adjustments, own profile.
-- **Supervisor** — everything above, plus **Manage Staff** (create, edit,
-  delete Pharmacist/Supervisor accounts). At least one Supervisor account
-  is always kept.
+- **Pharmacist** — full operational access (inventory, sales, purchases, expenses, prescriptions, bank, etc.).
+- **Supervisor** — everything Pharmacist can do, plus **Manage Staff**.
+- **Owner** — can **view all screens and data** but cannot create, edit or delete anything (read-only oversight).
+
+### Bank Transactions
+- Summary cards: Opening Balance, Total Deposits (academic year), Total
+  Withdrawals (academic year), current Bank Balance.
+- Ledger of all deposits / withdrawals with date, bank, purpose, slip
+  reference and who recorded it.
+- **Record Transaction** modal (Deposit / Withdrawal).
+- **Set Opening Balance** (one record; replaces previous).
+- Academic year is treated as 1 Sep → 31 Aug.
+
+### Purchases / Goods Received
+- Record stock received from suppliers with multi-line items.
+- Automatically increases inventory quantities and updates unit cost.
+- Optional: create a matching **bank withdrawal** for the purchase total.
+- Deleting a purchase reverses the stock increase.
+
+### Expenses
+- Track operating costs by category (Utilities, Salaries, Rent, Transport, etc.).
+- Summary cards: total expenses, top category, this month.
+- Optional: create a matching **bank withdrawal**.
+- Filter by category.
+
 
 ## Security notes for going live
 
@@ -126,3 +147,22 @@ maralex-system/
 - Restrict your MongoDB Atlas Network Access list to the IP(s) that will
   run this server.
 - Serve over HTTPS in production.
+
+### Prescriptions / Dispensing
+- Create prescriptions with patient, doctor, diagnosis and multiple medicines.
+- Dispense partially or fully — stock is reduced on dispense.
+- Statuses: Pending → Partially Dispensed → Dispensed (or Cancelled).
+
+### Purchase Order Workflow
+- Create as **Goods Received** (stock now) or **Purchase Order** (receive later).
+- Receive goods on a PO to add stock; cancel reverses any partial receipts.
+
+### Slip File Upload
+- Bank transactions accept an optional image/PDF slip (stored under `/uploads`).
+
+### Audit Log
+- System-wide activity log: who created, updated, dispensed, received, etc.
+
+### Profit & Loss Report
+- Under Sales Reports → switch to **Profit & Loss**.
+- Revenue − COGS − Expenses = Net Profit/Loss for any date range.
