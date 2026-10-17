@@ -6,7 +6,7 @@
 // Express server (e.g. http://localhost:5000) still works.
 const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? '/api'
-  : 'https://maralexhospital.onrender.com/api';
+  : 'https://maralexhospital-1.onrender.com/api';
  
 function getToken() {
   return localStorage.getItem('maralex_token');

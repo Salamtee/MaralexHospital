@@ -145,6 +145,8 @@ function applyRoleNav() {
   show('navBank', isSuper || isOwner);
   show('navAudit', isSuper || isOwner);
   show('navTreatments', isSuper || isOwner);
+  // Pharmacist cannot add inventory items
+  show('addItemBtn', !isPharm);
   // Owner: hide Sales / POS (view activities via reports only)
   show('navSales', !isOwner);
 }
@@ -435,13 +437,20 @@ function filterInventory() {
   document.getElementById('inventoryBody').innerHTML = arr.length
     ? arr.map((p) => {
         const s = status(p);
-        return `<tr><td>${p.sku}</td><td><b>${p.name}</b></td><td>${p.cat}</td><td>${p.batch}</td><td>${new Date(p.expiry).toISOString().slice(0, 10)}</td><td>${p.qty}</td><td>${p.reorder}</td><td>${fmt(p.cost)}</td><td>${fmt(p.price)}</td><td><span class="badge ${s[0]}">${s[1]}</span></td><td><button class="btn small secondary" onclick="quickAdjust('${p._id}')">Adjust</button></td></tr>`;
+        const rd = p.reorderDate ? new Date(p.reorderDate).toISOString().slice(0, 10) : '—';
+        const action = currentUser && currentUser.role === 'Supervisor'
+          ? `<button class="btn small secondary" onclick="editProduct('${p._id}')">Edit Item</button>`
+          : currentUser && currentUser.role === 'Pharmacist'
+            ? `<button class="btn small secondary" onclick="quickAdjust('${p._id}')">Adjust</button>`
+            : '—';
+        return `<tr><td>${p.sku}</td><td><b>${p.name}</b></td><td>${p.cat}</td><td>${p.batch}</td><td>${new Date(p.expiry).toISOString().slice(0, 10)}</td><td>${p.qty}</td><td>${p.reorder}</td><td>${rd}</td><td>${fmt(p.cost)}</td><td>${fmt(p.price)}</td><td><span class="badge ${s[0]}">${s[1]}</span></td><td>${action}</td></tr>`;
       }).join('')
-    : '<tr><td colspan="11" class="empty">No inventory items yet. Click "Add Item" to get started.</td></tr>';
+    : `<tr><td colspan="12" class="empty">No inventory items yet.${currentUser && currentUser.role === 'Pharmacist' ? '' : ' Click "Add Item" to get started.'}</td></tr>`;
 }
 
 
 async function refreshNextSku() {
+  if (document.getElementById('pId')?.value) return; // editing: SKU is fixed
   const cat = document.getElementById('pCat')?.value || 'Medicines';
   try {
     const { sku } = await api.nextSku(cat);
@@ -452,29 +461,78 @@ async function refreshNextSku() {
   }
 }
 
+function setProductModalMode(editing) {
+  document.getElementById('productModalTitle').textContent = editing ? 'Edit Inventory Item' : 'Add Inventory Item';
+  document.getElementById('productSaveBtn').textContent = editing ? 'Save Changes' : 'Save Item';
+  // Quantity is changed through Stock Adjustments so stock movements stay audited
+  const qty = document.getElementById('pQty');
+  qty.disabled = editing;
+  qty.title = editing ? 'Use Stock Adjustments to change quantity' : '';
+}
+
 function openProductModal() {
   if (guardOwnerAction()) return;
+  if (currentUser.role !== 'Supervisor') return toast('Only Supervisors can add inventory items.', true);
   document.getElementById('productForm').reset();
+  document.getElementById('pId').value = '';
+  setProductModalMode(false);
   document.getElementById('productModal').classList.add('show');
   refreshNextSku();
 }
 
+function editProduct(id) {
+  if (guardOwnerAction()) return;
+  if (currentUser.role !== 'Supervisor') return toast('Only Supervisors can edit inventory items.', true);
+  const p = products.find((x) => x._id === id);
+  if (!p) return toast('Item not found.', true);
+  document.getElementById('productForm').reset();
+  document.getElementById('pId').value = p._id;
+  pName.value = p.name;
+  pSku.value = p.sku;
+  pCat.value = p.cat;
+  pBatch.value = p.batch;
+  pExpiry.value = new Date(p.expiry).toISOString().slice(0, 10);
+  pQty.value = p.qty;
+  pReorder.value = p.reorder;
+  pReorderDate.value = p.reorderDate ? new Date(p.reorderDate).toISOString().slice(0, 10) : '';
+  pCost.value = p.cost;
+  pPrice.value = p.price;
+  setProductModalMode(true);
+  document.getElementById('productModal').classList.add('show');
+}
+
 document.getElementById('productForm').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const id = document.getElementById('pId').value;
   try {
-    await api.createProduct({
-      name: pName.value.trim(),
-      sku: (pSku.value || '').trim(),
-      cat: pCat.value,
-      batch: pBatch.value.trim(),
-      expiry: pExpiry.value,
-      qty: pQty.value,
-      reorder: pReorder.value,
-      cost: pCost.value,
-      price: pPrice.value
-    });
+    if (id) {
+      await api.updateProduct(id, {
+        name: pName.value.trim(),
+        cat: pCat.value,
+        batch: pBatch.value.trim(),
+        expiry: pExpiry.value,
+        reorder: pReorder.value,
+        reorderDate: pReorderDate.value,
+        cost: pCost.value,
+        price: pPrice.value
+      });
+      toast('Inventory item updated.');
+    } else {
+      await api.createProduct({
+        name: pName.value.trim(),
+        sku: (pSku.value || '').trim(),
+        cat: pCat.value,
+        batch: pBatch.value.trim(),
+        expiry: pExpiry.value,
+        qty: pQty.value,
+        reorder: pReorder.value,
+        reorderDate: pReorderDate.value,
+        cost: pCost.value,
+        price: pPrice.value
+      });
+      toast('Inventory item added.');
+    }
     closeModal('productModal');
-    toast('Inventory item added.');
     await renderInventory();
     await renderDashboard();
   } catch (err) {
@@ -682,8 +740,8 @@ document.getElementById('customerForm').addEventListener('submit', async (e) => 
 async function renderAdjustments() {
   const adjustments = await api.listAdjustments();
   document.getElementById('adjustBody').innerHTML = adjustments.length
-    ? adjustments.map((a) => `<tr><td>${a.date}</td><td>${a.item}</td><td>${a.type}</td><td>${a.qty}</td><td>${a.reason}</td></tr>`).join('')
-    : '<tr><td colspan="5" class="empty">No stock adjustments recorded.</td></tr>';
+    ? adjustments.map((a) => `<tr><td>${a.date}</td><td>${a.item}</td><td>${a.type}</td><td>${a.qty}</td><td>${a.reason}</td><td>${a.reorderDate || '—'}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No stock adjustments recorded.</td></tr>';
 }
 
 async function openAdjustModal() {
@@ -692,19 +750,28 @@ async function openAdjustModal() {
   const s = document.getElementById('aItem');
   s.innerHTML = products.map((p) => `<option value="${p._id}">${p.name} (${p.qty})</option>`).join('');
   document.getElementById('adjustForm').reset();
+  prefillAdjustReorderDate();
   document.getElementById('adjustModal').classList.add('show');
 }
+
+// Pre-fill the Reorder Date with the item's current one (if any)
+function prefillAdjustReorderDate() {
+  const p = products.find((x) => x._id === document.getElementById('aItem').value);
+  document.getElementById('aReorderDate').value = p && p.reorderDate ? new Date(p.reorderDate).toISOString().slice(0, 10) : '';
+}
+document.getElementById('aItem').addEventListener('change', prefillAdjustReorderDate);
 
 function quickAdjust(id) {
   openAdjustModal().then(() => {
     document.getElementById('aItem').value = id;
+    prefillAdjustReorderDate();
   });
 }
 
 document.getElementById('adjustForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
-    await api.createAdjustment({ productId: aItem.value, type: aType.value, qty: aQty.value, reason: aReason.value });
+    await api.createAdjustment({ productId: aItem.value, type: aType.value, qty: aQty.value, reason: aReason.value, reorderDate: aReorderDate.value });
     closeModal('adjustModal');
     toast('Stock adjustment recorded.');
     await renderAdjustments();
