@@ -25,6 +25,7 @@ const app = express();
 
 const allowedOrigins = [
   'https://maralex-hospital.vercel.app',
+  'https://maralexhospital-hbh1.onrender.com',
   'http://localhost:5000',
   'http://127.0.0.1:5000',
   'http://localhost:5173' // adjust/remove if you don't use a local dev server on this port
@@ -87,7 +88,7 @@ connectDB().then(() => {
   // 10 minutes keeps the instance counted as active. Render sets
   // RENDER_EXTERNAL_URL automatically; the literal URL below is a fallback
   // for running this same code elsewhere.
-  const SELF_URL = process.env.RENDER_EXTERNAL_URL || 'https://maralexhospital.onrender.com';
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL || 'https://maralexhospital-hbh1.onrender.com';
   setInterval(() => {
     fetch(`${SELF_URL}/api/health`)
       .then((r) => console.log(`[keep-alive] ping ${r.status}`))

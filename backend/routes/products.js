@@ -1,6 +1,7 @@
 const express = require('express');
 const Product = require('../models/Product');
-const { requireAuth, requireWrite } = require('../middleware/auth');
+const { requireAuth, requireWrite, requireRole } = require('../middleware/auth');
+const { logAudit } = require('../utils/audit');
 const { notifySupervisorsAndOwners } = require('../utils/notify');
 
 const router = express.Router();
@@ -45,7 +46,8 @@ router.get('/next-sku', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+// Only Supervisors may add or edit inventory items (Pharmacists can view, sell and adjust stock)
+router.post('/', requireRole('Supervisor'), async (req, res) => {
   try {
     const { name, cat, batch, expiry, qty, reorder, cost, price } = req.body;
     if (!name || !cat || !batch || !expiry) {
@@ -69,7 +71,8 @@ router.post('/', async (req, res) => {
       qty: Number(qty) || 0,
       reorder: Number(reorder) || 10,
       cost: Number(cost) || 0,
-      price: Number(price) || 0
+      price: Number(price) || 0,
+      reorderDate: req.body.reorderDate || null
     });
 
     if (product.qty <= product.reorder) {
@@ -87,13 +90,33 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('Supervisor'), async (req, res) => {
   try {
-    const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
+    // Whitelist editable fields. SKU is fixed, and quantity is changed through
+    // Stock Adjustments so every stock movement keeps an audit trail.
+    const allowed = ['name', 'cat', 'batch', 'expiry', 'reorder', 'cost', 'price', 'reorderDate'];
+    const update = {};
+    for (const k of allowed) if (req.body[k] !== undefined) update[k] = req.body[k];
+    if (update.name !== undefined) update.name = String(update.name).trim();
+    if (update.batch !== undefined) update.batch = String(update.batch).trim();
+    ['reorder', 'cost', 'price'].forEach((k) => { if (update[k] !== undefined) update[k] = Number(update[k]) || 0; });
+    if (update.reorderDate === '') update.reorderDate = null;
+
+    const product = await Product.findByIdAndUpdate(req.params.id, update, {
       new: true,
       runValidators: true
     });
     if (!product) return res.status(404).json({ message: 'Item not found.' });
+
+    logAudit({
+      action: 'update',
+      entity: 'Product',
+      entityId: product._id,
+      summary: `Edited item ${product.name} (${product.sku})`,
+      details: update,
+      user: req.user,
+      req
+    });
 
     if (product.qty <= product.reorder) {
       notifySupervisorsAndOwners({

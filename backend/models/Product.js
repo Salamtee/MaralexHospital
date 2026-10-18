@@ -14,7 +14,8 @@ const productSchema = new mongoose.Schema(
     qty: { type: Number, required: true, min: 0, default: 0 },
     reorder: { type: Number, required: true, min: 0, default: 10 },
     cost: { type: Number, required: true, min: 0 },
-    price: { type: Number, required: true, min: 0 }
+    price: { type: Number, required: true, min: 0 },
+    reorderDate: { type: Date, default: null }
   },
   { timestamps: true }
 );

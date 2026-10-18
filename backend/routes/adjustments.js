@@ -19,10 +19,10 @@ router.get('/', async (req, res) => {
   res.json(adjustments);
 });
 
-// POST /api/adjustments  { productId, type, qty, reason }
+// POST /api/adjustments  { productId, type, qty, reason, reorderDate? }
 router.post('/', async (req, res) => {
   try {
-    const { productId, type, qty, reason } = req.body;
+    const { productId, type, qty, reason, reorderDate } = req.body;
     const product = await Product.findById(productId);
     if (!product) return res.status(404).json({ message: 'Item not found.' });
     const amount = Number(qty);
@@ -34,6 +34,7 @@ router.post('/', async (req, res) => {
     } else {
       product.qty += amount;
     }
+    if (reorderDate) product.reorderDate = reorderDate;
     await product.save();
 
     const adjustment = await Adjustment.create({
@@ -43,6 +44,7 @@ router.post('/', async (req, res) => {
       type,
       qty: amount,
       reason,
+      reorderDate: reorderDate || '',
       adjustedBy: req.user._id
     });
     res.status(201).json({ adjustment, product });
