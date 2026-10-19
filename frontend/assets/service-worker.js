@@ -1,4 +1,4 @@
-const CACHE_NAME = 'maralex-allied-shell-v6';
+const CACHE_NAME = 'maralex-allied-shell-v4';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -30,7 +30,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request).catch(
         () =>
-          new Response(JSON.stringify({ message: 'Cannot reach the server. Check your connection and try again (the server may be waking up).' }), {
+          new Response(JSON.stringify({ message: 'You appear to be offline.' }), {
             headers: { 'Content-Type': 'application/json' },
             status: 503
           })
@@ -40,7 +40,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    fetch(request, { cache: 'no-cache' })
+    fetch(request)
       .then((response) => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));

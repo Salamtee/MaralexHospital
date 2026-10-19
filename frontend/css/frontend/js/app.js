@@ -464,10 +464,10 @@ async function refreshNextSku() {
 function setProductModalMode(editing) {
   document.getElementById('productModalTitle').textContent = editing ? 'Edit Inventory Item' : 'Add Inventory Item';
   document.getElementById('productSaveBtn').textContent = editing ? 'Save Changes' : 'Save Item';
-  // Quantity is changed through Stock Adjustments so stock movements stay audited
+  // Supervisors can edit quantity directly; changes are logged as stock adjustments
   const qty = document.getElementById('pQty');
-  qty.disabled = editing;
-  qty.title = editing ? 'Use Stock Adjustments to change quantity' : '';
+  qty.disabled = false;
+  qty.title = editing ? 'Changing this records a stock adjustment' : '';
 }
 
 function openProductModal() {
@@ -511,6 +511,7 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
         cat: pCat.value,
         batch: pBatch.value.trim(),
         expiry: pExpiry.value,
+        qty: pQty.value,
         reorder: pReorder.value,
         reorderDate: pReorderDate.value,
         cost: pCost.value,
