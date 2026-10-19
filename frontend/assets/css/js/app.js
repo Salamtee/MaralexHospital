@@ -506,7 +506,7 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   const id = document.getElementById('pId').value;
   try {
     if (id) {
-      await api.updateProduct(id, {
+      const saved = await api.updateProduct(id, {
         name: pName.value.trim(),
         cat: pCat.value,
         batch: pBatch.value.trim(),
@@ -517,7 +517,11 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
         cost: pCost.value,
         price: pPrice.value
       });
-      toast('Inventory item updated.');
+      if (saved && Number(saved.qty) !== Number(pQty.value)) {
+        toast('Saved, but the server did not apply the new quantity. The backend on Render needs the latest deploy.', true);
+      } else {
+        toast('Inventory item updated.');
+      }
     } else {
       await api.createProduct({
         name: pName.value.trim(),

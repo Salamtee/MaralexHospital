@@ -8,7 +8,6 @@ const adjustmentSchema = new mongoose.Schema(
     type: { type: String, enum: ['Received', 'Damaged', 'Correction'], required: true },
     qty: { type: Number, required: true, min: 1 },
     reason: { type: String, required: true },
-    reorderDate: { type: String, default: '' }, // YYYY-MM-DD, optional
     adjustedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   },
   { timestamps: true }

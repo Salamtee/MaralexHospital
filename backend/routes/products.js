@@ -3,6 +3,7 @@ const Product = require('../models/Product');
 const { requireAuth, requireWrite, requireRole } = require('../middleware/auth');
 const { logAudit } = require('../utils/audit');
 const { notifySupervisorsAndOwners } = require('../utils/notify');
+const Adjustment = require('../models/Adjustment');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -92,8 +93,8 @@ router.post('/', requireRole('Supervisor'), async (req, res) => {
 
 router.put('/:id', requireRole('Supervisor'), async (req, res) => {
   try {
-    // Whitelist editable fields. SKU is fixed, and quantity is changed through
-    // Stock Adjustments so every stock movement keeps an audit trail.
+    // Whitelist editable fields. SKU is fixed. Supervisors may also edit the
+    // quantity directly; any change is recorded as a stock adjustment + audit entry.
     const allowed = ['name', 'cat', 'batch', 'expiry', 'reorder', 'cost', 'price', 'reorderDate'];
     const update = {};
     for (const k of allowed) if (req.body[k] !== undefined) update[k] = req.body[k];
@@ -102,18 +103,46 @@ router.put('/:id', requireRole('Supervisor'), async (req, res) => {
     ['reorder', 'cost', 'price'].forEach((k) => { if (update[k] !== undefined) update[k] = Number(update[k]) || 0; });
     if (update.reorderDate === '') update.reorderDate = null;
 
+    // Quantity edit (Supervisor only - route is already restricted)
+    const existing = await Product.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: 'Item not found.' });
+    const oldQty = existing.qty;
+    let newQty = oldQty;
+    if (req.body.qty !== undefined && req.body.qty !== '' && req.body.qty !== null) {
+      newQty = Number(req.body.qty);
+      if (!Number.isInteger(newQty) || newQty < 0) {
+        return res.status(400).json({ message: 'Quantity must be a whole number of 0 or more.' });
+      }
+      update.qty = newQty;
+    }
+
     const product = await Product.findByIdAndUpdate(req.params.id, update, {
       new: true,
       runValidators: true
     });
     if (!product) return res.status(404).json({ message: 'Item not found.' });
 
+    if (newQty !== oldQty) {
+      const diff = newQty - oldQty;
+      await Adjustment.create({
+        date: new Date().toISOString().slice(0, 10),
+        item: product.name,
+        product: product._id,
+        type: diff > 0 ? 'Correction' : 'Damaged',
+        qty: Math.abs(diff),
+        reason: (req.body.qtyReason || '').trim() || `Quantity edited by Supervisor (${oldQty} -> ${newQty})`,
+        adjustedBy: req.user._id
+      });
+    }
+
     logAudit({
       action: 'update',
       entity: 'Product',
       entityId: product._id,
-      summary: `Edited item ${product.name} (${product.sku})`,
-      details: update,
+      summary: newQty !== oldQty
+        ? `Edited item ${product.name} (${product.sku}); quantity ${oldQty} -> ${newQty}`
+        : `Edited item ${product.name} (${product.sku})`,
+      details: newQty !== oldQty ? { ...update, oldQty, newQty } : update,
       user: req.user,
       req
     });
