@@ -162,10 +162,23 @@ router.put('/:id', requireRole('Supervisor'), async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
-  const product = await Product.findByIdAndDelete(req.params.id);
-  if (!product) return res.status(404).json({ message: 'Item not found.' });
-  res.json({ message: 'Item deleted.' });
+// DELETE /api/products/:id  (Supervisor only)
+router.delete('/:id', requireRole('Supervisor'), async (req, res) => {
+  try {
+    const product = await Product.findByIdAndDelete(req.params.id);
+    if (!product) return res.status(404).json({ message: 'Item not found.' });
+    await logAudit({
+      action: 'DELETE',
+      entity: 'Product',
+      entityId: product._id,
+      summary: `Deleted item ${product.name} (${product.sku})`,
+      user: req.user,
+      req
+    });
+    res.json({ message: 'Item deleted.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not delete item.', error: err.message });
+  }
 });
 
 module.exports = router;

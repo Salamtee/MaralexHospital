@@ -1,6 +1,7 @@
 const express = require('express');
 const User = require('../models/User');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { logAudit } = require('../utils/audit');
 
 const router = express.Router();
 router.use(requireAuth, requireRole('Supervisor'));
@@ -55,12 +56,16 @@ router.put('/:id', async (req, res) => {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'Staff account not found.' });
 
-    if (user.role === 'Owner') {
-      return res.status(403).json({ message: 'Owner accounts cannot be changed here.' });
-    }
+    // Supervisors may manage the Owner's name, phone number and password,
+    // but the Owner's role itself can never be changed here.
+    const isOwnerAccount = user.role === 'Owner';
+    const changes = [];
 
-    if (name) user.name = name.trim();
-    if (role) {
+    if (name) {
+      if (user.name !== name.trim()) changes.push('name');
+      user.name = name.trim();
+    }
+    if (role && !isOwnerAccount) {
       if (!['Pharmacist', 'Supervisor'].includes(role)) {
         return res.status(400).json({ message: 'Staff role must be Pharmacist or Supervisor.' });
       }
@@ -68,12 +73,33 @@ router.put('/:id', async (req, res) => {
     }
     if (phone !== undefined && phone !== null && String(phone).trim()) {
       const normalized = User.normalizePhone(phone);
+      if (!normalized || normalized.replace(/\D/g, '').length < 7) {
+        return res.status(400).json({ message: 'Enter a valid phone number.' });
+      }
       const dupe = await User.findOne({ _id: { $ne: user._id }, phone: normalized });
       if (dupe) return res.status(409).json({ message: 'That phone number is already registered.' });
+      if (user.phone !== normalized) changes.push('phone number');
       user.phone = normalized;
     }
-    if (password) user.password = password;
+    if (password) {
+      if (String(password).length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+      }
+      user.password = password;
+      changes.push('password');
+    }
     await user.save();
+
+    if (isOwnerAccount) {
+      await logAudit({
+        action: 'UPDATE',
+        entity: 'User',
+        entityId: user._id,
+        summary: `Supervisor updated Owner account (${changes.join(', ') || 'no changes'})`,
+        user: req.user,
+        req
+      });
+    }
     res.json(user.toSafeObject());
   } catch (err) {
     res.status(500).json({ message: 'Could not update staff account.', error: err.message });

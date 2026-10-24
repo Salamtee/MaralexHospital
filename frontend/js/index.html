@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#4b7a22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="MARALEX Allied Pharmaceutical & Medical Inventory and Sales Management System">
+<link rel="icon" href="assets/maralex-logo.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>MARALEX Allied — Pharmaceutical & Medical Inventory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Playfair+Display:ital,wght@1,500;1,600;1,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function(){try{var t=localStorage.getItem('maralex_theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');else if(t==='light')document.documentElement.setAttribute('data-theme','light');else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+</script>
+</head>
+<body>
+
+<div class="login-wrap" id="loginScreen">
+  <div class="login-box">
+    <img class="login-logo" src="assets/maralex-logo.png" alt="MARALEX Allied logo">
+    <h2>MARALEX ALLIED</h2>
+    <p class="login-sub">Pharmaceutical &amp; Medical Inventory and Sales</p>
+    <div class="role-tabs">
+      <button type="button" class="role-tab active" data-role="Pharmacist" onclick="selectRole('Pharmacist')">Pharmacist</button>
+      <button type="button" class="role-tab" data-role="Supervisor" onclick="selectRole('Supervisor')">Supervisor</button>
+      <button type="button" class="role-tab" data-role="Owner" onclick="selectRole('Owner')">Owner</button>
+    </div>
+    <form id="loginForm">
+      <div class="field"><label>Phone Number</label><input class="input" style="width:100%" id="lPhone" type="tel" inputmode="tel" placeholder="e.g. 0760000001" required autocomplete="tel"></div>
+      <div class="field"><label>Password</label><input class="input" style="width:100%" type="password" id="lPass" required autocomplete="current-password"></div>
+      <div class="login-error" id="loginError"></div>
+      <button class="btn primary" style="width:100%;margin-top:8px" id="loginBtn">Login</button>
+    </form>
+  </div>
+</div>
+
+<div class="app" id="appRoot" style="display:none">
+<aside class="sidebar">
+  <div class="brand"><img src="assets/maralex-logo.png" alt="MARALEX Allied logo"><h2>MARALEX ALLIED</h2><p>Hospital & Educational Services</p></div>
+  <nav class="nav">
+    <button class="active" data-page="dashboard"><span>▦</span><b>Dashboard</b></button>
+    <button data-page="inventory"><span>▤</span><b>Inventory</b></button>
+    <button data-page="sales" id="navSales"><span>₣</span><b>Sales / POS</b></button>
+    <button data-page="reports"><span>▥</span><b>Sales Reports</b></button>
+    <button data-page="suppliers"><span>♙</span><b>Suppliers</b></button>
+    <button data-page="customers"><span>♙</span><b>Patients / Customers</b></button>
+    <button data-page="stock"><span>↕</span><b>Stock Adjustments</b></button>
+    <button data-page="purchases" id="navPurchases"><span>📦</span><b>Purchases</b></button>
+    <button data-page="expenses" id="navExpenses"><span>💸</span><b>Expenses</b></button>
+    <button data-page="prescriptions"><span>📋</span><b>Prescriptions</b></button>
+    <button data-page="treatments" id="navTreatments" style="display:none"><span>🩺</span><b>Treatments</b></button>
+    <button data-page="bank" id="navBank"><span>🏦</span><b>Bank Transactions</b></button>
+    <button data-page="audit" id="navAudit"><span>📝</span><b>Audit Log</b></button>
+    <button data-page="staff" id="navStaff" style="display:none"><span>⚕</span><b>Manage Staff</b></button>
+    <button data-page="profile"><span>◍</span><b>My Profile</b></button>
+  </nav>
+  <div class="side-bottom">MARALEX Allied • Live data</div>
+</aside>
+<div class="nav-backdrop" id="navBackdrop" onclick="closeMobileNav()"></div>
+
+<main class="main">
+<header class="topbar">
+  <div class="topbar-left">
+    <button type="button" class="menu-btn" id="menuBtn" aria-label="Open menu" onclick="toggleMobileNav()">
+      <span></span><span></span><span></span>
+    </button>
+    <h1 id="pageTitle">Dashboard</h1>
+  </div>
+  <div class="top-actions">
+    <button type="button" class="btn secondary small theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode" aria-label="Toggle theme">🌙</button>
+    <button type="button" class="btn primary small" id="installAppBtn" style="display:none" onclick="installPwa()">⬇ Install App</button>
+    <button type="button" class="btn secondary small" id="enablePushBtn" style="display:none" onclick="enablePushNotifications()">🔔 Enable Alerts</button>
+
+    <span class="pill" id="today"></span>
+    <div class="user-chip" id="userChip"></div>
+    <button class="btn secondary small" onclick="logout()">⏻ Logout</button>
+  </div>
+</header>
+<div class="view-only-banner" id="viewOnlyBanner" style="display:none">
+  <span>👁 Owner view-only mode — you can see everything but cannot create, edit or delete records.</span>
+</div>
+<div class="content">
+
+<section class="page active" id="dashboard">
+<div class="section-head"><div><h2>Inventory & Sales Overview</h2><p>Live analytics for stock, sales and pharmacy performance.</p></div>
+<button class="btn primary" id="dashNewSaleBtn" onclick="go('sales')">＋ New Sale</button></div>
+
+<div class="cards dash-kpi">
+ <div class="card kpi kpi-green"><div class="kpi-icon">▤</div><div class="label">Inventory Items</div><div class="metric" id="mItems">0</div><div class="delta">Active stock records</div></div>
+ <div class="card kpi kpi-amber"><div class="kpi-icon">⚠</div><div class="label">Low / Out of Stock</div><div class="metric" id="mLow">0</div><div class="delta">Needs attention</div></div>
+ <div class="card kpi kpi-blue"><div class="kpi-icon">₣</div><div class="label">Today's Sales</div><div class="metric" id="mToday">Le 0</div><div class="delta">Current day total</div></div>
+ <div class="card kpi kpi-purple"><div class="kpi-icon">⌁</div><div class="label">Near Expiry</div><div class="metric" id="mExpiry">0</div><div class="delta">Within 90 days</div></div>
+ <div class="card kpi kpi-teal" style="cursor:pointer" onclick="go('bank')"><div class="kpi-icon">🏦</div><div class="label">Bank Balance</div><div class="metric" id="mBank">Le 0</div><div class="delta">Click to open ledger</div></div>
+</div>
+
+<div class="dash-grid">
+  <div class="panel chart-panel">
+    <div class="chart-head"><h3>Sales — This Week (Sun–Sat)</h3><span class="chart-sub" id="weekTotalLabel">Week total: Le 0</span></div>
+    <div class="bar-chart" id="chart"></div>
+  </div>
+  <div class="panel chart-panel">
+    <div class="chart-head"><h3>Inventory by Category</h3><span class="chart-sub">Product mix</span></div>
+    <div class="pie-wrap"><div id="pieChart" class="pie-chart"></div><div id="pieLegend" class="pie-legend"></div></div>
+  </div>
+</div>
+
+<div class="dash-grid" style="margin-top:16px">
+  <div class="panel chart-panel">
+    <div class="chart-head"><h3>Stock Health</h3><span class="chart-sub">Status breakdown</span></div>
+    <div id="stockProgress" class="progress-stack"></div>
+    <div class="mini-stats" id="stockMiniStats"></div>
+  </div>
+  <div class="panel chart-panel">
+    <div class="chart-head"><h3>Top Products Sold</h3><span class="chart-sub">By units</span></div>
+    <div id="topProducts" class="hbar-chart"></div>
+  </div>
+  <div class="panel chart-panel">
+    <div class="chart-head"><h3>Revenue Snapshot</h3><span class="chart-sub">This period</span></div>
+    <div class="revenue-cards">
+      <div class="rev-card rev-today"><span>Today</span><b id="revToday">Le 0</b></div>
+      <div class="rev-card rev-week"><span>This week</span><b id="revWeek">Le 0</b></div>
+      <div class="rev-card rev-month"><span>This month</span><b id="revMonth">Le 0</b></div>
+      <div class="rev-card rev-all"><span>All time</span><b id="revAll">Le 0</b></div>
+    </div>
+  </div>
+</div>
+
+<div class="dash-grid" style="margin-top:16px">
+  <div class="panel"><h3>Inventory Alerts</h3><div id="alerts"></div></div>
+  <div class="panel" style="grid-column:span 2"><h3>Recent Sales</h3><div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th>Date</th><th>Customer / Patient</th><th>Items</th><th>Total</th><th>Status</th></tr></thead><tbody id="recentSales"></tbody></table></div></div>
+</div>
+</section>
+
+<section class="page" id="inventory">
+<div class="section-head"><div><h2>Pharmaceutical & Medical Inventory</h2><p>All sales are linked to available inventory quantities.</p></div><button class="btn primary" id="addItemBtn" onclick="openProductModal()">＋ Add Item</button></div>
+<div class="toolbar"><input class="input" id="invSearch" placeholder="Search item, SKU or category..." oninput="renderInventory()"><select class="select" id="invCat" onchange="renderInventory()"><option value="">All categories</option><option>Medicines</option><option>Medical Supplies</option><option>Laboratory</option><option>Equipment</option></select><select class="select" id="invStatus" onchange="renderInventory()"><option value="">All stock status</option><option value="ok">In stock</option><option value="low">Low stock</option><option value="out">Out of stock</option><option value="expired">Expired</option></select></div>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>SKU</th><th>Item</th><th>Category</th><th>Batch</th><th>Expiry</th><th>Qty</th><th>Reorder</th><th>Reorder Date</th><th>Cost</th><th>Sale Price</th><th>Status</th><th>Action</th></tr></thead><tbody id="inventoryBody"></tbody></table></div></div>
+</section>
+
+<section class="page" id="sales">
+<div class="section-head"><div><h2>Sales / Point of Sale</h2><p>Select inventory items to build a sale, linked to live stock.</p></div></div>
+<div class="pos">
+<div><div class="toolbar"><input class="input" id="posSearch" placeholder="Search inventory..." oninput="renderPOS()"><select class="select" id="posCat" onchange="renderPOS()"><option value="">All categories</option><option>Medicines</option><option>Medical Supplies</option><option>Laboratory</option><option>Equipment</option></select></div><div class="product-grid" id="productGrid"></div></div>
+<div class="panel cart"><h3>Current Sale</h3><div class="field"><label>Patient / Customer</label><input class="input" id="saleCustomer" placeholder="Walk-in Patient" style="width:100%"></div><div id="cart"></div><div class="total"><span>Total</span><span id="cartTotal">Le 0</span></div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn secondary" style="flex:1" onclick="clearCart()">Clear</button><button class="btn primary" style="flex:2" onclick="checkout()">Complete Sale</button></div></div>
+</div>
+</section>
+
+<section class="page" id="reports">
+<div class="section-head"><div><h2>Sales Reports</h2><p>View daily, weekly, monthly or yearly sales and generate a PDF report.</p></div><button class="btn blue" onclick="downloadPDF()">⇩ Download PDF</button></div>
+<div class="toolbar">
+<select class="select" id="reportMode" onchange="switchReportMode()">
+  <option value="sales">Sales Report</option>
+  <option value="pnl">Profit &amp; Loss</option>
+</select>
+<select class="select" id="reportPeriod" onchange="renderReports()"><option value="daily">Daily</option><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select>
+<input class="input" type="date" id="reportDate" onchange="renderReports()">
+<span id="pnlDateRange" style="display:none;gap:8px;align-items:center">
+  <input class="input" type="date" id="pnlFrom" onchange="renderPnL()">
+  <span style="font-size:11px;color:var(--muted)">to</span>
+  <input class="input" type="date" id="pnlTo" onchange="renderPnL()">
+</span>
+</div>
+<div id="salesReportPanel">
+<div class="report-cards"><div class="report-card"><h4>Sales Total</h4><p id="rTotal">Le 0</p></div><div class="report-card"><h4>Transactions</h4><p id="rTx">0</p></div><div class="report-card"><h4>Units Sold</h4><p id="rUnits">0</p></div><div class="report-card"><h4>Average Sale</h4><p id="rAvg">Le 0</p></div></div>
+<div class="panel"><h3 id="reportHeading">Weekly Sales</h3><div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th>Date</th><th>Customer / Patient</th><th>Item(s) Sold</th><th>Units</th><th>Total</th></tr></thead><tbody id="reportBody"></tbody></table></div></div>
+</div>
+<div id="pnlPanel" style="display:none">
+  <div class="report-cards">
+    <div class="report-card"><h4>Revenue (Sales)</h4><p id="pnlRevenue">Le 0</p></div>
+    <div class="report-card"><h4>Cost of Goods</h4><p id="pnlCogs">Le 0</p></div>
+    <div class="report-card"><h4>Gross Profit</h4><p id="pnlGross">Le 0</p></div>
+    <div class="report-card"><h4>Expenses</h4><p id="pnlExpenses">Le 0</p></div>
+    <div class="report-card"><h4>Net Profit / Loss</h4><p id="pnlNet">Le 0</p></div>
+  </div>
+  <div class="grid2">
+    <div class="panel"><h3>Summary</h3><div id="pnlSummary"></div></div>
+    <div class="panel"><h3>Expenses by Category</h3><div id="pnlByCat"></div></div>
+  </div>
+</div>
+</section>
+
+<section class="page" id="suppliers">
+<div class="section-head"><div><h2>Suppliers</h2><p>Manage pharmaceutical, laboratory and medical supply sources.</p></div><button class="btn primary" onclick="openSupplierModal()">＋ Add Supplier</button></div>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Supplier</th><th>Contact</th><th>Phone</th><th>Products</th><th>Status</th></tr></thead><tbody id="supplierBody"></tbody></table></div></div>
+</section>
+
+<section class="page" id="customers">
+<div class="section-head"><div><h2>Patients / Customers</h2><p>Simple sales-linked customer records. No email field is used.</p></div><button class="btn primary" onclick="openCustomerModal()">＋ Add Customer</button></div>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Phone</th><th>Type</th><th>Total Purchases</th><th>Last Visit</th></tr></thead><tbody id="customerBody"></tbody></table></div></div>
+</section>
+
+<section class="page" id="stock">
+<div class="section-head"><div><h2>Stock Adjustments</h2><p>Record received stock, damaged items and manual corrections.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn danger" id="clearAdjustBtn" style="display:none" onclick="clearAdjustments()">🗑 Clear All</button><button class="btn primary" onclick="openAdjustModal()">＋ Adjust Stock</button></div></div>
+<div class="toolbar"><input class="input" id="adjSearch" placeholder="Search item, type or reason..." oninput="filterAdjustments()"></div>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Item</th><th>Type</th><th>Quantity</th><th>Reason</th><th>Reorder Date</th><th id="adjActionTh" style="display:none">Action</th></tr></thead><tbody id="adjustBody"></tbody></table></div></div>
+</section>
+
+
+<section class="page" id="purchases">
+<div class="section-head"><div><h2>Purchases / Goods Received</h2><p>Record stock received from suppliers. Quantities are added to inventory automatically.</p></div>
+<button class="btn primary" onclick="openPurchaseModal()">＋ New Purchase</button></div>
+<div class="toolbar"><input class="input" id="purSearch" placeholder="Search invoice, supplier or item..." oninput="filterPurchases()"></div>
+<div class="panel"><div class="table-wrap"><table class="table">
+<thead><tr><th>Invoice</th><th>Date</th><th>Supplier</th><th>Items</th><th>Total Cost</th><th>Paid</th><th>Balance</th><th>Status</th><th>Paid from Bank</th><th>Recorded By</th><th>Action</th></tr></thead>
+<tbody id="purchaseBody"></tbody>
+</table></div></div>
+</section>
+
+<section class="page" id="expenses">
+<div class="section-head"><div><h2>Expenses</h2><p>Track operating costs. Optionally create a matching bank withdrawal.</p></div>
+<button class="btn primary" onclick="openExpenseModal()">＋ Record Expense</button></div>
+<div class="cards" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+  <div class="card"><div class="label">Total Expenses</div><div class="metric" id="expTotal">Le 0</div><div class="delta" id="expCount">0 records</div></div>
+  <div class="card"><div class="label">Top Category</div><div class="metric" id="expTopCat" style="font-size:18px">—</div><div class="delta" id="expTopAmt">Le 0</div></div>
+  <div class="card"><div class="label">This Month</div><div class="metric" id="expMonth">Le 0</div><div class="delta">Calendar month</div></div>
+</div>
+<div class="toolbar">
+  <select class="select" id="expCatFilter" onchange="renderExpenses()">
+    <option value="">All categories</option>
+    <option>Utilities</option><option>Salaries &amp; Wages</option><option>Rent</option>
+    <option>Transport</option><option>Maintenance</option><option>Office Supplies</option>
+    <option>Professional Fees</option><option>Bank Charges</option><option>Other</option>
+  </select>
+</div>
+<div class="panel"><div class="table-wrap"><table class="table">
+<thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Bank</th><th>Reason</th><th>Recorded By</th><th>Action</th></tr></thead>
+<tbody id="expenseBody"></tbody>
+</table></div></div>
+</section>
+
+
+<section class="page" id="prescriptions">
+<div class="section-head"><div><h2>Prescriptions / Dispensing</h2><p>Record prescriptions and dispense medicines against inventory.</p></div>
+<button class="btn primary" onclick="openRxModal()">＋ New Prescription</button></div>
+<div class="toolbar">
+  <input class="input" id="rxSearch" placeholder="Search patient, Rx number, doctor..." oninput="renderPrescriptions()">
+  <select class="select" id="rxStatusFilter" onchange="renderPrescriptions()">
+    <option value="">All statuses</option>
+    <option>Pending</option>
+    <option>Partially Dispensed</option>
+    <option>Dispensed</option>
+    <option>Cancelled</option>
+  </select>
+</div>
+<div class="panel"><div class="table-wrap"><table class="table">
+<thead><tr><th>Rx No.</th><th>Date</th><th>Patient</th><th>Doctor</th><th>Items</th><th>Status</th><th>Action</th></tr></thead>
+<tbody id="rxBody"></tbody>
+</table></div></div>
+</section>
+
+<section class="page" id="audit">
+<div class="section-head"><div><h2>Audit Log</h2><p>Who did what, and when — across the whole system.</p></div><button class="btn danger" id="clearAuditBtn" style="display:none" onclick="clearAuditLog()">🗑 Clear All</button></div>
+<div class="toolbar">
+  <select class="select" id="auditEntity" onchange="renderAudit()">
+    <option value="">All entities</option>
+    <option>Product</option><option>Sale</option><option>Purchase</option>
+    <option>BankTransaction</option><option>Expense</option><option>Prescription</option>
+    <option>Adjustment</option><option>User</option>
+  </select>
+  <select class="select" id="auditAction" onchange="renderAudit()">
+    <option value="">All actions</option>
+    <option>CREATE</option><option>UPDATE</option><option>DELETE</option>
+    <option>DISPENSE</option><option>RECEIVE</option><option>CANCEL</option><option>LOGIN</option>
+  </select>
+  <input class="input" type="date" id="auditFrom" onchange="renderAudit()">
+  <input class="input" type="date" id="auditTo" onchange="renderAudit()">
+</div>
+<div class="panel"><div class="table-wrap"><table class="table">
+<thead><tr><th>When</th><th>User</th><th>Role</th><th>Action</th><th>Entity</th><th>Summary</th><th id="auditActionTh" style="display:none">Action</th></tr></thead>
+<tbody id="auditBody"></tbody>
+</table></div></div>
+</section>
+
+
+<section class="page" id="treatments">
+<div class="section-head"><div><h2>Patient Treatments &amp; Payments</h2><p>Record treatments and full or partial payments. Supervisor only.</p></div>
+<button class="btn primary" onclick="openTreatmentModal()">＋ Record Treatment</button></div>
+<div class="toolbar">
+  <input class="input" id="trSearch" placeholder="Search patient or treatment no..." oninput="renderTreatments()">
+  <select class="select" id="trStatusFilter" onchange="renderTreatments()">
+    <option value="">All payment status</option>
+    <option>Unpaid</option>
+    <option>Partial</option>
+    <option>Paid</option>
+  </select>
+</div>
+<div class="panel"><div class="table-wrap"><table class="table">
+<thead><tr><th>No.</th><th>Date</th><th>Patient</th><th>Treatment</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead>
+<tbody id="treatmentBody"></tbody>
+</table></div></div>
+</section>
+<section class="page" id="bank">
+<div class="section-head"><div><h2>Bank Deposit / Withdrawal Ledger</h2><p>Track pharmacy bank account movements, opening balance and running balance.</p></div>
+<button class="btn primary" onclick="openBankModal()">＋ Record Transaction</button></div>
+
+<div class="cards bank-cards">
+  <div class="card bank-card">
+    <span class="icon bank-icon open">$</span>
+    <div class="label">Opening Balance</div>
+    <div class="metric" id="bankOpening">Le 0</div>
+    <div class="delta" id="bankOpeningDate">—</div>
+  </div>
+  <div class="card bank-card">
+    <span class="icon bank-icon dep">↓</span>
+    <div class="label">Total Deposits</div>
+    <div class="metric" id="bankDeposits">Le 0</div>
+    <div class="delta positive" id="bankDepLabel">This academic year</div>
+  </div>
+  <div class="card bank-card">
+    <span class="icon bank-icon wd">↑</span>
+    <div class="label">Total Withdrawals</div>
+    <div class="metric" id="bankWithdrawals">Le 0</div>
+    <div class="delta negative" id="bankWdLabel">This academic year</div>
+  </div>
+  <div class="card bank-card">
+    <span class="icon bank-icon bal">🏦</span>
+    <div class="label">Bank Balance</div>
+    <div class="metric" id="bankBalance">Le 0</div>
+    <div class="delta positive">Current</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="section-head" style="margin-bottom:12px">
+    <div><h3 style="margin:0;font-size:15px">Bank Deposit / Withdrawal Ledger</h3></div>
+    <div class="toolbar" style="margin:0">
+      <select class="select" id="bankTypeFilter" onchange="renderBank()">
+        <option value="">All types</option>
+        <option value="Deposit">Deposits</option>
+        <option value="Withdrawal">Withdrawals</option>
+        <option value="Opening">Opening Balance</option>
+      </select>
+      <button class="btn secondary small" onclick="openOpeningBalanceModal()">Set Opening Balance</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>DATE</th>
+          <th>TYPE</th>
+          <th>AMOUNT</th>
+          <th>BANK</th>
+          <th>PURPOSE</th>
+          <th>REFERENCE</th>
+          <th>RECORDED BY</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="bankBody"></tbody>
+    </table>
+  </div>
+</div>
+</section>
+
+<section class="page" id="staff">
+<div class="section-head"><div><h2>Manage Staff</h2><p>Create and manage Pharmacist and Supervisor login accounts, and manage the Owner's phone number and password.</p></div><button class="btn primary" onclick="openStaffModal()">＋ Add Staff</button></div>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Phone (Login)</th><th>Role</th><th>Action</th></tr></thead><tbody id="staffBody"></tbody></table></div></div>
+</section>
+
+<section class="page" id="profile">
+<div class="section-head"><div><h2>My Profile</h2><p>View and update your own account details and password.</p></div></div>
+<div class="grid2">
+<div class="panel">
+<h3>Account Details</h3>
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+  <img id="pfAvatarPreview" src="" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;background:#eef2f7;display:none">
+  <div class="avatar" id="pfAvatarFallback" style="width:72px;height:72px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800"></div>
+  <div>
+    <label class="btn secondary small" style="display:inline-block;cursor:pointer">
+      Change photo
+      <input type="file" id="pfAvatar" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+    </label>
+    <p style="font-size:10px;color:var(--muted);margin:6px 0 0">JPG/PNG, max 8 MB</p>
+  </div>
+</div>
+<form id="profileForm">
+<div class="form-grid">
+<div class="field"><label>Full Name</label><input class="input" id="pfName" required></div>
+<div class="field"><label>Phone Number (login)</label><input class="input" id="pfPhone" type="tel" required></div>
+<div class="field"><label>Role</label><input class="input" id="pfRole" disabled></div>
+</div>
+<button class="btn primary" style="margin-top:16px">Save Changes</button>
+</form>
+</div>
+<div class="panel">
+<h3>Change Password</h3>
+<form id="passwordForm">
+<div class="form-grid">
+<div class="field"><label>Current Password</label><input class="input" type="password" id="pfCurPass" required></div>
+<div class="field"><label>New Password</label><input class="input" type="password" id="pfNewPass" required minlength="6"></div>
+<div class="field"><label>Confirm New Password</label><input class="input" type="password" id="pfConfPass" required minlength="6"></div>
+</div>
+<button class="btn primary" style="margin-top:16px">Update Password</button>
+</form>
+<div class="danger-zone">
+<h3>Danger Zone</h3>
+<p style="font-size:11px;color:var(--muted);margin:0 0 10px">Deleting your account permanently removes your login access.</p>
+<button class="btn danger" onclick="deleteAccount()" type="button">Delete My Account</button>
+</div>
+</div>
+</div>
+</section>
+</div></main>
+</div>
+
+<div class="modal" id="productModal"><div class="modal-box"><div class="modal-head"><h3 id="productModalTitle">Add Inventory Item</h3><button class="x" onclick="closeModal('productModal')">×</button></div><form id="productForm"><input type="hidden" id="pId"><div class="form-grid">
+<div class="field"><label>Item Name</label><input class="input" id="pName" required></div><div class="field"><label>SKU (auto)</label><input class="input" id="pSku" readonly placeholder="Generated from category" style="background:#f8fafc"></div><div class="field"><label>Category</label><select class="select" id="pCat" onchange="refreshNextSku()"><option>Medicines</option><option>Medical Supplies</option><option>Laboratory</option><option>Equipment</option></select></div>
+<div class="field"><label>Batch Number</label><input class="input" id="pBatch" required></div><div class="field"><label>Expiry Date</label><input class="input" type="date" id="pExpiry" required></div><div class="field"><label>Quantity</label><input class="input" type="number" id="pQty" min="0" required></div>
+<div class="field"><label>Reorder Level</label><input class="input" type="number" id="pReorder" min="0" value="10"></div><div class="field"><label>Reorder Date</label><input class="input" type="date" id="pReorderDate"></div><div class="field"><label>Cost Price (Le)</label><input class="input" type="number" id="pCost" min="0" required></div><div class="field"><label>Sale Price (Le)</label><input class="input" type="number" id="pPrice" min="0" required></div>
+</div><button class="btn primary" id="productSaveBtn" style="margin-top:16px">Save Item</button></form></div></div>
+
+<div class="modal" id="supplierModal"><div class="modal-box"><div class="modal-head"><h3>Add Supplier</h3><button class="x" onclick="closeModal('supplierModal')">×</button></div><form id="supplierForm"><div class="form-grid"><div class="field"><label>Supplier Name</label><input class="input" id="sName" required></div><div class="field"><label>Contact Person</label><input class="input" id="sContact" required></div><div class="field"><label>Phone</label><input class="input" id="sPhone" required></div></div><button class="btn primary" style="margin-top:16px">Save Supplier</button></form></div></div>
+
+<div class="modal" id="customerModal"><div class="modal-box"><div class="modal-head"><h3>Add Patient / Customer</h3><button class="x" onclick="closeModal('customerModal')">×</button></div><form id="customerForm"><div class="form-grid"><div class="field"><label>Name</label><input class="input" id="cName" required></div><div class="field"><label>Phone</label><input class="input" id="cPhone" required></div><div class="field"><label>Type</label><select class="select" id="cType"><option>Patient</option><option>Walk-in Customer</option><option>Clinic / Department</option></select></div></div><button class="btn primary" style="margin-top:16px">Save Customer</button></form></div></div>
+
+<div class="modal" id="adjustModal"><div class="modal-box"><div class="modal-head"><h3>Stock Adjustment</h3><button class="x" onclick="closeModal('adjustModal')">×</button></div><form id="adjustForm"><div class="form-grid"><div class="field"><label>Item</label><select class="select" id="aItem" required></select></div><div class="field"><label>Adjustment Type</label><select class="select" id="aType"><option value="Received">Received / Added</option><option value="Damaged">Damaged / Removed</option><option value="Correction">Correction / Added</option></select></div><div class="field"><label>Quantity</label><input class="input" type="number" id="aQty" min="1" required></div><div class="field"><label>Reason</label><input class="input" id="aReason" required></div><div class="field"><label>Reorder Date</label><input class="input" type="date" id="aReorderDate"></div></div><button class="btn primary" style="margin-top:16px">Save Adjustment</button></form></div></div>
+
+<div class="modal" id="staffModal"><div class="modal-box"><div class="modal-head"><h3 id="staffModalTitle">Add Staff</h3><button class="x" onclick="closeModal('staffModal')">×</button></div><form id="staffForm"><input type="hidden" id="stId"><div class="form-grid"><div class="field"><label>Full Name</label><input class="input" id="stName" required></div><div class="field"><label>Phone Number (login)</label><input class="input" id="stPhone" type="tel" required placeholder="e.g. 0760000001"></div><div class="field"><label>Role</label><select class="select" id="stRole"><option>Pharmacist</option><option>Supervisor</option></select></div><div class="field"><label>Password</label><input class="input" type="password" id="stPass" placeholder="Leave blank to keep unchanged"></div></div><button class="btn primary" style="margin-top:16px">Save Staff</button></form></div></div>
+
+<div class="modal" id="bankModal">
+  <div class="modal-box" style="width:min(520px,100%)">
+    <div class="modal-head">
+      <h3>Record Bank Transaction</h3>
+      <button class="x" onclick="closeModal('bankModal')">×</button>
+    </div>
+    <form id="bankForm">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr">
+        <div class="field">
+          <label>Type</label>
+          <select class="select" id="bType" required>
+            <option value="Deposit">Deposit</option>
+            <option value="Withdrawal">Withdrawal</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Amount (Le)</label>
+          <input class="input" type="number" id="bAmount" min="1" step="1" placeholder="e.g. 5000000" required>
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <input class="input" type="date" id="bDate" required>
+        </div>
+        <div class="field">
+          <label>Bank Name</label>
+          <input class="input" id="bBank" placeholder="e.g. Rokel Commercial Bank" required>
+        </div>
+        <div class="field" style="grid-column:1 / -1">
+          <label>Purpose / Description</label>
+          <input class="input" id="bPurpose" placeholder="e.g. Term 2 fee collections deposit">
+        </div>
+        <div class="field" style="grid-column:1 / -1">
+          <label>Deposit / Withdrawal Slip Reference</label>
+          <input class="input" id="bRef" placeholder="Slip number or reference">
+        </div>
+        <div class="field" style="grid-column:1 / -1">
+          <label>Deposit / Withdrawal Slip (image or PDF)</label>
+          <input class="input" type="file" id="bSlip" accept="image/*,.pdf">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button type="button" class="btn secondary" onclick="closeModal('bankModal')">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="openingModal">
+  <div class="modal-box" style="width:min(420px,100%)">
+    <div class="modal-head">
+      <h3>Set Opening Balance</h3>
+      <button class="x" onclick="closeModal('openingModal')">×</button>
+    </div>
+    <form id="openingForm">
+      <div class="field">
+        <label>Opening Balance Amount (Le)</label>
+        <input class="input" type="number" id="oAmount" min="0" step="1" placeholder="e.g. 15306" required style="width:100%">
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>As of Date</label>
+        <input class="input" type="date" id="oDate" required style="width:100%">
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>Note (optional)</label>
+        <input class="input" id="oNote" placeholder="e.g. Balance carried forward" style="width:100%">
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin:12px 0 0">This replaces any previous opening balance. Bank balance will be recalculated.</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button type="button" class="btn secondary" onclick="closeModal('openingModal')">Cancel</button>
+        <button type="submit" class="btn primary">Save Opening Balance</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<div class="modal" id="purchaseModal">
+  <div class="modal-box" style="width:min(780px,100%)">
+    <div class="modal-head"><h3>New Purchase / Goods Received</h3><button class="x" onclick="closeModal('purchaseModal')">×</button></div>
+    <form id="purchaseForm">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="field"><label>Supplier</label><select class="select" id="puSupplier" required></select></div>
+        <div class="field"><label>Date</label><input class="input" type="date" id="puDate" required></div>
+        <div class="field"><label>Type</label>
+          <select class="select" id="puStatus">
+            <option value="Received">Goods Received (stock now)</option>
+            <option value="Ordered">Purchase Order (receive later)</option>
+          </select>
+        </div>
+        <div class="field"><label>Expected Date (for POs)</label><input class="input" type="date" id="puExpected"></div>
+        <div class="field" style="grid-column:span 2"><label>Notes</label><input class="input" id="puNotes" placeholder="Optional"></div>
+      </div>
+      <div style="margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:13px">Line Items</b>
+        <button type="button" class="btn secondary small" onclick="addPurchaseLine()">＋ Add Line</button>
+      </div>
+      <div id="purchaseLines"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+        <label style="font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="puPaidBank"> Also record as bank withdrawal
+        </label>
+        <div style="font-size:12px">Total Cost: <b id="puTotal">Le 0</b></div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-top:10px">
+        <div class="field"><label>Amount Paid Now (Le)</label><input class="input" type="number" min="0" step="1" id="puPaid" placeholder="Leave blank if fully paid" oninput="updatePurchaseTotal()"></div>
+        <div class="field"><label>Balance Remaining</label><div style="padding:10px 0;font-size:14px"><b id="puBalance">Le 0</b></div></div>
+      </div>
+      <div class="field" id="puBankWrap" style="display:none;margin-top:10px">
+        <label>Bank Name</label>
+        <input class="input" id="puBank" placeholder="e.g. Rokel Commercial Bank" style="width:100%">
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button type="button" class="btn secondary" onclick="closeModal('purchaseModal')">Cancel</button>
+        <button type="submit" class="btn primary">Save Purchase</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="expenseModal">
+  <div class="modal-box" style="width:min(520px,100%)">
+    <div class="modal-head"><h3>Record Expense</h3><button class="x" onclick="closeModal('expenseModal')">×</button></div>
+    <form id="expenseForm">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr">
+        <div class="field"><label>Category</label>
+          <select class="select" id="exCategory" required>
+            <option value="Utilities">Utilities</option>
+            <option value="Salaries &amp; Wages">Salaries &amp; Wages</option>
+            <option value="Rent">Rent</option>
+            <option value="Transport">Transport</option>
+            <option value="Maintenance">Maintenance</option>
+            <option value="Office Supplies">Office Supplies</option>
+            <option value="Professional Fees">Professional Fees</option>
+            <option value="Bank Charges">Bank Charges</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Amount (Le)</label><input class="input" type="number" id="exAmount" min="1" step="1" required></div>
+        <div class="field"><label>Date</label><input class="input" type="date" id="exDate" required></div>
+        <div class="field"><label>Reason for Expense</label><input class="input" id="exReason" required placeholder="e.g. Generator ran out of fuel"></div>
+        <div class="field" style="grid-column:1/-1"><label>Description</label><input class="input" id="exDesc" required placeholder="e.g. Electricity bill for September"></div>
+      </div>
+      <label style="font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:12px">
+        <input type="checkbox" id="exPaidBank"> Also record as bank withdrawal
+      </label>
+      <div class="field" id="exBankWrap" style="display:none;margin-top:10px">
+        <label>Bank Name</label>
+        <input class="input" id="exBank" placeholder="e.g. Rokel Commercial Bank" style="width:100%">
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button type="button" class="btn secondary" onclick="closeModal('expenseModal')">Cancel</button>
+        <button type="submit" class="btn primary">Save Expense</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<div class="modal" id="rxModal">
+  <div class="modal-box" style="width:min(780px,100%)">
+    <div class="modal-head"><h3>New Prescription</h3><button class="x" onclick="closeModal('rxModal')">×</button></div>
+    <form id="rxForm">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="field"><label>Patient Name</label><input class="input" id="rxPatient" required></div>
+        <div class="field"><label>Patient Phone</label><input class="input" id="rxPhone"></div>
+        <div class="field"><label>Date</label><input class="input" type="date" id="rxDate" required></div>
+        <div class="field"><label>Doctor</label><input class="input" id="rxDoctor" placeholder="Prescribing doctor"></div>
+        <div class="field" style="grid-column:span 2"><label>Diagnosis</label><input class="input" id="rxDiagnosis"></div>
+      </div>
+      <div style="margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:13px">Medicines</b>
+        <button type="button" class="btn secondary small" onclick="addRxLine()">＋ Add Medicine</button>
+      </div>
+      <div id="rxLines"></div>
+      <div class="field" style="margin-top:10px"><label>Notes</label><input class="input" id="rxNotes" style="width:100%"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button type="button" class="btn secondary" onclick="closeModal('rxModal')">Cancel</button>
+        <button type="submit" class="btn primary">Save Prescription</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="dispenseModal">
+  <div class="modal-box" style="width:min(560px,100%)">
+    <div class="modal-head"><h3>Dispense Prescription</h3><button class="x" onclick="closeModal('dispenseModal')">×</button></div>
+    <div id="dispenseInfo" style="font-size:12px;margin-bottom:12px;color:var(--muted)"></div>
+    <div id="dispenseLines"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button type="button" class="btn secondary" onclick="closeModal('dispenseModal')">Cancel</button>
+      <button type="button" class="btn primary" onclick="confirmDispense()">Dispense Selected</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal" id="treatmentModal">
+  <div class="modal-box" style="width:min(640px,100%)">
+    <div class="modal-head"><h3>Record Patient Treatment</h3><button class="x" onclick="closeModal('treatmentModal')">×</button></div>
+    <form id="treatmentForm">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr">
+        <div class="field"><label>Patient Name</label><input class="input" id="trPatient" required></div>
+        <div class="field"><label>Patient Phone</label><input class="input" id="trPhone" type="tel"></div>
+        <div class="field"><label>Date</label><input class="input" type="date" id="trDate" required></div>
+        <div class="field"><label>Doctor</label><input class="input" id="trDoctor"></div>
+        <div class="field" style="grid-column:1/-1"><label>Diagnosis</label><input class="input" id="trDiagnosis"></div>
+        <div class="field" style="grid-column:1/-1"><label>Treatment Details</label><textarea class="input" id="trDetails" rows="3" required style="width:100%;resize:vertical"></textarea></div>
+        <div class="field"><label>Total Amount (Le)</label><input class="input" type="number" id="trTotal" min="0" required></div>
+        <div class="field"><label>Initial Payment (Le)</label><input class="input" type="number" id="trInitial" min="0" value="0" placeholder="0 = unpaid / partial later"></div>
+        <div class="field"><label>Payment Method</label>
+          <select class="select" id="trMethod"><option>Cash</option><option>Bank Transfer</option><option>Mobile Money</option><option>Card</option><option>Other</option></select>
+        </div>
+        <div class="field"><label>Payment Reference</label><input class="input" id="trPayRef"></div>
+        <div class="field" style="grid-column:1/-1"><label>Notes</label><input class="input" id="trNotes"></div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button type="button" class="btn secondary" onclick="closeModal('treatmentModal')">Cancel</button>
+        <button type="submit" class="btn primary">Save Treatment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="trPayModal">
+  <div class="modal-box" style="width:min(420px,100%)">
+    <div class="modal-head"><h3>Record Payment</h3><button class="x" onclick="closeModal('trPayModal')">×</button></div>
+    <p id="trPayInfo" style="font-size:12px;color:var(--muted);margin:0 0 12px"></p>
+    <form id="trPayForm">
+      <input type="hidden" id="trPayId">
+      <div class="field"><label>Amount (Le)</label><input class="input" type="number" id="trPayAmt" min="1" required style="width:100%"></div>
+      <div class="field" style="margin-top:10px"><label>Method</label>
+        <select class="select" id="trPayMethod" style="width:100%"><option>Cash</option><option>Bank Transfer</option><option>Mobile Money</option><option>Card</option><option>Other</option></select>
+      </div>
+      <div class="field" style="margin-top:10px"><label>Reference</label><input class="input" id="trPayReference" style="width:100%"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button type="button" class="btn secondary" onclick="closeModal('trPayModal')">Cancel</button>
+        <button type="submit" class="btn primary">Save Payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="notifyPromptModal">
+  <div class="modal-box notify-prompt-box">
+    <div class="notify-prompt-icon">🔔</div>
+    <h3>Stay updated on pharmacy activity</h3>
+    <p>Enable alerts to receive notifications about low stock, expiring medicines, new sales, bank movements and treatments — even when the app is in the background.</p>
+    <ul class="notify-benefits">
+      <li>Low stock &amp; near-expiry warnings</li>
+      <li>Every sale completed</li>
+      <li>Bank deposits &amp; withdrawals</li>
+      <li>Patient treatment payments</li>
+    </ul>
+    <div class="notify-prompt-actions">
+      <button type="button" class="btn secondary" onclick="dismissNotifyPrompt(false)">Not now</button>
+      <button type="button" class="btn primary" onclick="acceptNotifyPrompt()">Enable notifications</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="installPromptModal">
+  <div class="modal-box install-prompt-box">
+    <div class="install-prompt-icon">📲</div>
+    <h3>Install MARALEX Allied</h3>
+    <p>Add this app to your home screen for faster access, offline support, and a full-screen pharmacy workspace — just like a native app.</p>
+    <ul class="install-benefits">
+      <li>One-tap access from your phone or desktop</li>
+      <li>Works better as a standalone window</li>
+      <li>Receive important alerts when installed</li>
+    </ul>
+    <div class="install-prompt-actions">
+      <button type="button" class="btn secondary" onclick="dismissInstallPrompt()">Not now</button>
+      <button type="button" class="btn primary" id="installPromptBtn" onclick="acceptInstallPrompt()">Install app</button>
+    </div>
+    <p class="install-hint" id="installHint" style="display:none"></p>
+  </div>
+</div>
+<div id="toastHost"></div>
+
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+}
+</script>
+</body>
+</html>

@@ -1,7 +1,8 @@
 const express = require('express');
 const Adjustment = require('../models/Adjustment');
 const Product = require('../models/Product');
-const { requireAuth, requireWrite } = require('../middleware/auth');
+const { requireAuth, requireWrite, requireRole } = require('../middleware/auth');
+const { logAudit } = require('../utils/audit');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -50,6 +51,43 @@ router.post('/', async (req, res) => {
     res.status(201).json({ adjustment, product });
   } catch (err) {
     res.status(500).json({ message: 'Could not record adjustment.', error: err.message });
+  }
+});
+
+// DELETE /api/adjustments/:id — remove one adjustment record (Supervisor only).
+// This only removes the history entry; current stock quantities are not changed.
+router.delete('/:id', requireRole('Supervisor'), async (req, res) => {
+  try {
+    const removed = await Adjustment.findByIdAndDelete(req.params.id);
+    if (!removed) return res.status(404).json({ message: 'Adjustment record not found.' });
+    await logAudit({
+      action: 'DELETE',
+      entity: 'Adjustment',
+      entityId: removed._id,
+      summary: `Deleted stock adjustment record for ${removed.item} (${removed.type} ${removed.qty})`,
+      user: req.user,
+      req
+    });
+    res.json({ message: 'Adjustment record deleted.', id: req.params.id });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not delete adjustment record.', error: err.message });
+  }
+});
+
+// DELETE /api/adjustments — clear ALL adjustment records (Supervisor only)
+router.delete('/', requireRole('Supervisor'), async (req, res) => {
+  try {
+    const result = await Adjustment.deleteMany({});
+    await logAudit({
+      action: 'DELETE',
+      entity: 'Adjustment',
+      summary: `Cleared stock adjustment history (${result.deletedCount} records removed)`,
+      user: req.user,
+      req
+    });
+    res.json({ message: `Cleared ${result.deletedCount} adjustment records.` });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not clear adjustment records.', error: err.message });
   }
 });
 
