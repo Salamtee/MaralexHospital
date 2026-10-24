@@ -50,13 +50,14 @@ router.get('/', async (req, res) => {
 
 // POST /api/purchases
 // body: { supplierId?, supplier, date, notes, paidFromBank, bankName, status?, expectedDate?,
-//         items: [{ productId, qty, unitCost }] }
+//         amountPaid?, items: [{ productId, qty, unitCost }] }
+// amountPaid: how much has been paid now (defaults to the full total). Balance = total - amountPaid.
 // status: 'Ordered' (PO only, no stock yet) or 'Received' (immediate goods received)
 router.post('/', async (req, res) => {
   try {
     const {
       supplierId, supplier, date, notes, paidFromBank, bankName,
-      items, status: requestedStatus, expectedDate
+      items, status: requestedStatus, expectedDate, amountPaid
     } = req.body;
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Add at least one item to the purchase.' });
@@ -102,6 +103,18 @@ router.post('/', async (req, res) => {
       total += lineTotal;
     }
 
+    // Payment: amountPaid defaults to the full total; the rest is the balance owed
+    let paid = total;
+    if (amountPaid !== undefined && amountPaid !== null && amountPaid !== '') {
+      paid = Number(amountPaid);
+      if (isNaN(paid) || paid < 0) {
+        return res.status(400).json({ message: 'Amount paid must be 0 or more.' });
+      }
+      if (paid > total) {
+        return res.status(400).json({ message: 'Amount paid cannot be more than the total cost.' });
+      }
+    }
+
     // Only increase stock if receiving now
     if (!asOrder) {
       for (const item of purchaseItems) {
@@ -119,6 +132,7 @@ router.post('/', async (req, res) => {
       supplierId: sid,
       items: purchaseItems,
       total,
+      amountPaid: paid,
       notes: (notes || '').trim(),
       status: asOrder ? 'Ordered' : 'Received',
       expectedDate: (expectedDate || '').trim(),
@@ -128,10 +142,10 @@ router.post('/', async (req, res) => {
       recordedByName: req.user.name || req.user.username
     });
 
-    if (paidFromBank && total > 0) {
+    if (paidFromBank && paid > 0) {
       await BankTransaction.create({
         type: 'Withdrawal',
-        amount: total,
+        amount: paid,
         date: date || todayISO(),
         bankName: (bankName || '').trim() || 'Pharmacy Bank',
         purpose: `Purchase ${purchase.invoice} — ${supplierName}`,
@@ -145,7 +159,7 @@ router.post('/', async (req, res) => {
       action: 'CREATE',
       entity: 'Purchase',
       entityId: purchase._id,
-      summary: `${asOrder ? 'Ordered' : 'Received'} ${purchase.invoice} from ${supplierName} (${total})`,
+      summary: `${asOrder ? 'Ordered' : 'Received'} ${purchase.invoice} from ${supplierName} (total ${total}, paid ${paid}, balance ${total - paid})`,
       user: req.user,
       req
     });
@@ -153,6 +167,55 @@ router.post('/', async (req, res) => {
     res.status(201).json(purchase);
   } catch (err) {
     res.status(500).json({ message: 'Could not record purchase.', error: err.message });
+  }
+});
+
+// POST /api/purchases/:id/payment
+// body: { amount, paidFromBank?, bankName? } — record a payment towards the balance
+router.post('/:id/payment', async (req, res) => {
+  try {
+    const purchase = await Purchase.findById(req.params.id);
+    if (!purchase) return res.status(404).json({ message: 'Purchase not found.' });
+    if (purchase.status === 'Cancelled') {
+      return res.status(400).json({ message: 'This order is cancelled.' });
+    }
+    const alreadyPaid = purchase.amountPaid == null ? purchase.total : purchase.amountPaid;
+    const balance = purchase.total - alreadyPaid;
+    if (balance <= 0) return res.status(400).json({ message: 'This purchase is already fully paid.' });
+
+    const amount = Number(req.body.amount);
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Enter a valid payment amount.' });
+    if (amount > balance) {
+      return res.status(400).json({ message: `Payment cannot be more than the balance (${balance}).` });
+    }
+
+    purchase.amountPaid = alreadyPaid + amount;
+    await purchase.save();
+
+    if (req.body.paidFromBank) {
+      await BankTransaction.create({
+        type: 'Withdrawal',
+        amount,
+        date: todayISO(),
+        bankName: String(req.body.bankName || '').trim() || 'Pharmacy Bank',
+        purpose: `Balance payment — ${purchase.invoice} (${purchase.supplier})`,
+        reference: purchase.invoice,
+        recordedBy: req.user._id,
+        recordedByName: req.user.name || req.user.username
+      });
+    }
+
+    await logAudit({
+      action: 'UPDATE',
+      entity: 'Purchase',
+      entityId: purchase._id,
+      summary: `Balance payment of ${amount} on ${purchase.invoice} (remaining ${purchase.total - purchase.amountPaid})`,
+      user: req.user,
+      req
+    });
+    res.json(purchase);
+  } catch (err) {
+    res.status(500).json({ message: 'Could not record payment.', error: err.message });
   }
 });
 

@@ -121,6 +121,15 @@ const api = {
   deleteExpense: (id) => apiRequest(`/expenses/${id}`, { method: 'DELETE' })
 ,
 
+  // purchase balance payment
+  payPurchase: (id, payload) => apiRequest(`/purchases/${id}/payment`, { method: 'POST', body: payload }),
+
+  // supervisor clean-up tools
+  deleteAudit: (id) => apiRequest(`/audit/${id}`, { method: 'DELETE' }),
+  clearAudit: () => apiRequest('/audit?all=true', { method: 'DELETE' }),
+  deleteAdjustment: (id) => apiRequest(`/adjustments/${id}`, { method: 'DELETE' }),
+  clearAdjustments: () => apiRequest('/adjustments', { method: 'DELETE' }),
+
   // purchases extras
   receivePurchase: (id, payload) => apiRequest(`/purchases/${id}/receive`, { method: 'POST', body: payload || {} }),
   cancelPurchase: (id) => apiRequest(`/purchases/${id}/cancel`, { method: 'PUT' }),

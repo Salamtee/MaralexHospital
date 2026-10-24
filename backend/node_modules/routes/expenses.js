@@ -49,14 +49,17 @@ router.get('/summary', async (req, res) => {
 });
 
 // POST /api/expenses
-// body: { date, category, amount, description, paidFromBank, bankName, reference }
+// body: { date, category, amount, description, reason, paidFromBank, bankName }
 router.post('/', async (req, res) => {
   try {
-    const { date, category, amount, description, paidFromBank, bankName, reference } = req.body;
+    const { date, category, amount, description, paidFromBank, bankName, reason } = req.body;
     const amt = Number(amount);
     if (!amt || amt < 0) return res.status(400).json({ message: 'Enter a valid amount.' });
     if (!description || !description.trim()) {
       return res.status(400).json({ message: 'Description is required.' });
+    }
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ message: 'Reason for the expense is required.' });
     }
     if (!category) return res.status(400).json({ message: 'Category is required.' });
 
@@ -67,7 +70,7 @@ router.post('/', async (req, res) => {
       description: description.trim(),
       paidFromBank: !!paidFromBank,
       bankName: (bankName || '').trim(),
-      reference: (reference || '').trim(),
+      reason: String(reason).trim(),
       recordedBy: req.user._id,
       recordedByName: req.user.name || req.user.username
     });
@@ -80,7 +83,7 @@ router.post('/', async (req, res) => {
         date: date || todayISO(),
         bankName: (bankName || '').trim() || 'Pharmacy Bank',
         purpose: `Expense — ${category}: ${description.trim()}`,
-        reference: (reference || '').trim() || expense._id.toString(),
+        reference: expense._id.toString(),
         recordedBy: req.user._id,
         recordedByName: req.user.name || req.user.username
       });

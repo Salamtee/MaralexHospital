@@ -19,7 +19,9 @@ const purchaseSchema = new mongoose.Schema(
     supplier: { type: String, required: true, trim: true },
     supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
     items: { type: [purchaseItemSchema], required: true },
-    total: { type: Number, required: true, min: 0 },
+    total: { type: Number, required: true, min: 0 }, // total cost of the purchase
+    // Amount paid so far. Older records have no value: they are treated as fully paid.
+    amountPaid: { type: Number, min: 0 },
     notes: { type: String, default: '' },
     // Workflow: Ordered → Partially Received → Received (or direct Received)
     status: {
@@ -33,7 +35,18 @@ const purchaseSchema = new mongoose.Schema(
     recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     recordedByName: { type: String, default: '' }
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: {
+      // Always expose amountPaid + balance so the frontend can show them
+      transform(doc, ret) {
+        const paid = ret.amountPaid == null ? ret.total : ret.amountPaid;
+        ret.amountPaid = paid;
+        ret.balance = Math.max(0, Math.round((ret.total - paid) * 100) / 100);
+        return ret;
+      }
+    }
+  }
 );
 
 module.exports = mongoose.model('Purchase', purchaseSchema);
