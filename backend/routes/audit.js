@@ -1,6 +1,7 @@
 const express = require('express');
 const AuditLog = require('../models/AuditLog');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { logAudit } = require('../utils/audit');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -32,9 +33,34 @@ router.get('/', async (req, res) => {
   }
 });
 
-// DELETE /api/audit  — clear old logs (Supervisor only)
+// DELETE /api/audit/:id  — delete a single log entry (Supervisor only)
+router.delete('/:id', requireRole('Supervisor'), async (req, res) => {
+  try {
+    const removed = await AuditLog.findByIdAndDelete(req.params.id);
+    if (!removed) return res.status(404).json({ message: 'Log entry not found.' });
+    res.json({ message: 'Log entry deleted.', id: req.params.id });
+  } catch (err) {
+    res.status(500).json({ message: 'Could not delete log entry.', error: err.message });
+  }
+});
+
+// DELETE /api/audit  — clear logs (Supervisor only)
+//   ?all=true            clears every entry
+//   ?olderThanDays=N     clears entries older than N days (default 90)
 router.delete('/', requireRole('Supervisor'), async (req, res) => {
   try {
+    if (req.query.all === 'true') {
+      const result = await AuditLog.deleteMany({});
+      // Leave a single entry so it is clear who cleared the log and when
+      await logAudit({
+        action: 'DELETE',
+        entity: 'AuditLog',
+        summary: `Cleared the audit log (${result.deletedCount} entries removed)`,
+        user: req.user,
+        req
+      });
+      return res.json({ message: `Cleared ${result.deletedCount} log entries.` });
+    }
     const days = Number(req.query.olderThanDays) || 90;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
