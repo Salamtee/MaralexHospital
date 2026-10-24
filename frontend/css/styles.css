@@ -325,11 +325,8 @@ body.is-owner #openingForm,
 body.is-owner #purchaseForm,
 body.is-owner #expenseForm,
 body.is-owner #rxForm,
-body.is-owner #profileForm,
-body.is-owner #passwordForm,
 body.is-owner .danger-zone{
-  pointer-events:none;
-  opacity:.55;
+  display:none;
 }
 
 
