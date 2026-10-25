@@ -57,7 +57,9 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/treatments', treatmentRoutes);
 app.use('/api/push', pushRoutes);
 
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+// "build" changes whenever new backend code is released, so opening /api/health
+// in a browser shows whether Render is really running the latest version.
+app.get('/api/health', (req, res) => res.json({ ok: true, build: '2026-10-25-past-sales' }));
 
 // Serve the frontend (HTML/CSS/JS/PWA files) from ../frontend
 const frontendDir = path.join(__dirname, '..', 'frontend');

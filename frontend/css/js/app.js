@@ -131,9 +131,9 @@ async function enterApp() {
 
 function applyRoleNav() {
   const role = currentUser && currentUser.role;
-  const show = (id, yes) => {
+  const show = (id, yes, display) => {
     const el = document.getElementById(id);
-    if (el) el.style.display = yes ? '' : 'none';
+    if (el) el.style.display = yes ? (display || '') : 'none';
   };
   // Pharmacist cannot access finance / audit pages
   const isPharm = role === 'Pharmacist';
@@ -147,6 +147,13 @@ function applyRoleNav() {
   show('navTreatments', isSuper || isOwner);
   // Pharmacist cannot add inventory items
   show('addItemBtn', !isPharm);
+  // Supervisor-only clean-up tools
+  show('pastSaleBox', isSuper);
+  show('pastSaleDateWrap', isSuper, 'flex');
+  show('clearAuditBtn', isSuper);
+  show('auditActionTh', isSuper);
+  show('clearAdjustBtn', isSuper);
+  show('adjActionTh', isSuper);
   // Owner: hide Sales / POS (view activities via reports only)
   show('navSales', !isOwner);
 }
@@ -154,7 +161,6 @@ function applyRoleNav() {
 
 
 async function uploadAvatar(input) {
-  if (guardOwnerAction()) return;
   const file = input.files && input.files[0];
   if (!file) return;
   try {
@@ -439,7 +445,7 @@ function filterInventory() {
         const s = status(p);
         const rd = p.reorderDate ? new Date(p.reorderDate).toISOString().slice(0, 10) : '—';
         const action = currentUser && currentUser.role === 'Supervisor'
-          ? `<button class="btn small secondary" onclick="editProduct('${p._id}')">Edit Item</button>`
+          ? `<button class="btn small secondary" onclick="editProduct('${p._id}')">Edit Item</button> <button class="btn small danger" onclick="deleteProduct('${p._id}')">Delete</button>`
           : currentUser && currentUser.role === 'Pharmacist'
             ? `<button class="btn small secondary" onclick="quickAdjust('${p._id}')">Adjust</button>`
             : '—';
@@ -448,6 +454,20 @@ function filterInventory() {
     : `<tr><td colspan="12" class="empty">No inventory items yet.${currentUser && currentUser.role === 'Pharmacist' ? '' : ' Click "Add Item" to get started.'}</td></tr>`;
 }
 
+
+async function deleteProduct(id) {
+  const p = products.find((x) => x._id === id);
+  const label = p ? `${p.name} (${p.sku})` : 'this item';
+  if (!confirm(`Delete ${label} from inventory? This cannot be undone.`)) return;
+  try {
+    await api.deleteProduct(id);
+    toast('Inventory item deleted.');
+    await renderInventory();
+    await renderDashboard();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
 
 async function refreshNextSku() {
   if (document.getElementById('pId')?.value) return; // editing: SKU is fixed
@@ -506,7 +526,7 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
   const id = document.getElementById('pId').value;
   try {
     if (id) {
-      await api.updateProduct(id, {
+      const saved = await api.updateProduct(id, {
         name: pName.value.trim(),
         cat: pCat.value,
         batch: pBatch.value.trim(),
@@ -517,7 +537,11 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
         cost: pCost.value,
         price: pPrice.value
       });
-      toast('Inventory item updated.');
+      if (saved && Number(saved.qty) !== Number(pQty.value)) {
+        toast('Saved, but the server did not apply the new quantity. The backend on Render needs the latest deploy.', true);
+      } else {
+        toast('Inventory item updated.');
+      }
     } else {
       await api.createProduct({
         name: pName.value.trim(),
@@ -544,6 +568,11 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
 /* ---------------- Sales / POS ---------------- */
 
 async function renderPOS() {
+  const sd = document.getElementById('saleDate');
+  if (sd) {
+    sd.max = todayISO();
+    if (!sd.value) sd.value = todayISO();
+  }
   await loadProducts();
   filterPOS();
   document.getElementById('cart').innerHTML = cart.length
@@ -599,13 +628,28 @@ async function checkout() {
   if (!cart.length) return toast('Add at least one item to the sale.', true);
   const customer = document.getElementById('saleCustomer').value.trim() || 'Walk-in Patient';
   try {
-    const sale = await api.checkout({
+    const isSuper = currentUser && currentUser.role === 'Supervisor';
+    const payload = {
       customer,
       items: cart.map((c) => ({ productId: c.productId, qty: c.qty }))
-    });
+    };
+    let isPast = false;
+    if (isSuper) {
+      const d = document.getElementById('saleDate').value || todayISO();
+      const deduct = document.getElementById('saleDeductStock').checked;
+      isPast = d !== todayISO() || !deduct;
+      if (isPast) {
+        payload.date = d;
+        payload.deductStock = deduct;
+        if (!confirm(`Record this sale dated ${d}${deduct ? '' : ' without changing current stock'}?`)) return;
+      }
+    }
+    const sale = await api.checkout(payload);
     cart = [];
     document.getElementById('saleCustomer').value = '';
-    toast(`Sale ${sale.invoice} completed successfully.`);
+    document.getElementById('saleDate').value = todayISO();
+    document.getElementById('saleDeductStock').checked = true;
+    toast(isPast ? `Past sale ${sale.invoice} recorded for ${sale.date}.` : `Sale ${sale.invoice} completed successfully.`);
     await renderPOS();
     await renderDashboard();
   } catch (err) {
@@ -738,11 +782,43 @@ document.getElementById('customerForm').addEventListener('submit', async (e) => 
 
 /* ---------------- Stock adjustments ---------------- */
 
+let adjustmentList = [];
+
 async function renderAdjustments() {
-  const adjustments = await api.listAdjustments();
-  document.getElementById('adjustBody').innerHTML = adjustments.length
-    ? adjustments.map((a) => `<tr><td>${a.date}</td><td>${a.item}</td><td>${a.type}</td><td>${a.qty}</td><td>${a.reason}</td><td>${a.reorderDate || '—'}</td></tr>`).join('')
-    : '<tr><td colspan="6" class="empty">No stock adjustments recorded.</td></tr>';
+  adjustmentList = await api.listAdjustments();
+  filterAdjustments();
+}
+
+function filterAdjustments() {
+  const q = (document.getElementById('adjSearch')?.value || '').trim().toLowerCase();
+  const isSuper = currentUser && currentUser.role === 'Supervisor';
+  const arr = adjustmentList.filter((a) => !q || `${a.item} ${a.type} ${a.reason} ${a.date}`.toLowerCase().includes(q));
+  const cols = isSuper ? 7 : 6;
+  document.getElementById('adjustBody').innerHTML = arr.length
+    ? arr.map((a) => `<tr><td>${a.date}</td><td>${a.item}</td><td>${a.type}</td><td>${a.qty}</td><td>${a.reason}</td><td>${a.reorderDate || '—'}</td>${isSuper ? `<td><button class="btn small danger" onclick="deleteAdjustment('${a._id}')">Delete</button></td>` : ''}</tr>`).join('')
+    : `<tr><td colspan="${cols}" class="empty">${adjustmentList.length ? 'No adjustments match your search.' : 'No stock adjustments recorded.'}</td></tr>`;
+}
+
+async function deleteAdjustment(id) {
+  if (!confirm('Delete this adjustment record? Current stock quantities will not change.')) return;
+  try {
+    await api.deleteAdjustment(id);
+    toast('Adjustment record deleted.');
+    await renderAdjustments();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+async function clearAdjustments() {
+  if (!confirm('Clear ALL stock adjustment records? Current stock quantities will not change. This cannot be undone.')) return;
+  try {
+    await api.clearAdjustments();
+    toast('Stock adjustment history cleared.');
+    await renderAdjustments();
+  } catch (err) {
+    toast(err.message, true);
+  }
 }
 
 async function openAdjustModal() {
@@ -788,8 +864,20 @@ document.getElementById('adjustForm').addEventListener('submit', async (e) => {
 
 let purchaseLines = [];
 
+let purchaseList = [];
+
 async function renderPurchases() {
-  const purchases = await api.listPurchases();
+  purchaseList = await api.listPurchases();
+  filterPurchases();
+}
+
+function filterPurchases() {
+  const q = (document.getElementById('purSearch')?.value || '').trim().toLowerCase();
+  const purchases = purchaseList.filter((p) => {
+    if (!q) return true;
+    const names = (p.items || []).map((i) => i.name).join(' ');
+    return `${p.invoice} ${p.supplier} ${names} ${p.status || ''}`.toLowerCase().includes(q);
+  });
   document.getElementById('purchaseBody').innerHTML = purchases.length
     ? purchases.map((p) => {
         const itemCount = (p.items || []).reduce((a, i) => a + i.qty, 0);
@@ -799,6 +887,8 @@ async function renderPurchases() {
         const actions = [];
         if (canReceive) actions.push(`<button class="btn small primary" onclick="receivePurchase('${p._id}')">Receive</button>`);
         if (st === 'Ordered' || st === 'Partially Received') actions.push(`<button class="btn small secondary" onclick="cancelPurchase('${p._id}')">Cancel</button>`);
+        const balance = Number(p.balance) || 0;
+        if (balance > 0 && st !== 'Cancelled' && !isOwner()) actions.push(`<button class="btn small primary" onclick="openPurchasePayModal('${p._id}')">Pay Balance</button>`);
         actions.push(`<button class="btn small danger" onclick="deletePurchase('${p._id}')">Delete</button>`);
         return `<tr>
           <td><b>${p.invoice}</b></td>
@@ -806,13 +896,32 @@ async function renderPurchases() {
           <td>${p.supplier}</td>
           <td>${itemCount} unit(s)</td>
           <td><b>${fmt(p.total)}</b></td>
+          <td>${fmt(p.amountPaid != null ? p.amountPaid : p.total)}</td>
+          <td>${Number(p.balance) > 0 ? `<b style="color:var(--danger,#b42318)">${fmt(p.balance)}</b>` : '<span class="badge ok">Paid</span>'}</td>
           <td><span class="badge ${stBadge}">${st}</span></td>
           <td>${p.paidFromBank ? '<span class="badge dep">Yes</span>' : '—'}</td>
           <td>${p.recordedByName || '—'}</td>
           <td style="white-space:nowrap">${actions.join(' ')}</td>
         </tr>`;
       }).join('')
-    : '<tr><td colspan="9" class="empty">No purchases recorded yet.</td></tr>';
+    : `<tr><td colspan="11" class="empty">${purchaseList.length ? 'No purchases match your search.' : 'No purchases recorded yet.'}</td></tr>`;
+}
+
+async function openPurchasePayModal(id) {
+  if (guardOwnerAction()) return;
+  const p = purchaseList.find((x) => x._id === id);
+  if (!p) return;
+  const raw = prompt(`Balance payment for ${p.invoice} (${p.supplier}).\nBalance owed: ${fmt(p.balance)}\n\nEnter amount paid now:`, String(p.balance));
+  if (raw === null) return;
+  const amount = Number(raw);
+  if (!amount || amount <= 0) return toast('Enter a valid amount.', true);
+  try {
+    await api.payPurchase(id, { amount });
+    toast('Balance payment recorded.');
+    await renderPurchases();
+  } catch (err) {
+    toast(err.message, true);
+  }
 }
 
 async function openPurchaseModal() {
@@ -828,6 +937,7 @@ async function openPurchaseModal() {
   document.getElementById('puPaidBank').checked = false;
   document.getElementById('puBankWrap').style.display = 'none';
   document.getElementById('puBank').value = '';
+  document.getElementById('puPaid').value = '';
   purchaseLines = [];
   addPurchaseLine();
   document.getElementById('purchaseModal').classList.add('show');
@@ -844,15 +954,29 @@ function removePurchaseLine(idx) {
   renderPurchaseLines();
 }
 
+function purchaseOptionsHtml(selectedId, term) {
+  const t = (term || '').trim().toLowerCase();
+  return products
+    .filter((p) => p._id === selectedId || !t || `${p.name} ${p.sku} ${p.cat}`.toLowerCase().includes(t))
+    .map((p) => `<option value="${p._id}" ${selectedId === p._id ? 'selected' : ''}>${p.name} (stock ${p.qty})</option>`)
+    .join('');
+}
+
+// Filter the item dropdown of one purchase line as the user types
+function searchPurchaseItem(i, term) {
+  const sel = document.getElementById('puItemSel' + i);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Select item…</option>' + purchaseOptionsHtml(purchaseLines[i].productId, term);
+}
+
 function renderPurchaseLines() {
   const host = document.getElementById('purchaseLines');
   host.innerHTML = purchaseLines.map((line, i) => {
-    const opts = products.map((p) =>
-      `<option value="${p._id}" ${line.productId === p._id ? 'selected' : ''}>${p.name} (stock ${p.qty})</option>`
-    ).join('');
+    const opts = purchaseOptionsHtml(line.productId, '');
     return `<div class="purchase-line" style="display:grid;grid-template-columns:2fr 80px 110px 30px;gap:8px;margin-bottom:8px;align-items:end">
       <div class="field" style="margin:0"><label>Item</label>
-        <select class="select" onchange="purchaseLines[${i}].productId=this.value;onPurchaseProductChange(${i})" style="width:100%">
+        <input class="input" type="search" placeholder="Search item…" oninput="searchPurchaseItem(${i}, this.value)" style="width:100%;margin-bottom:4px">
+        <select class="select" id="puItemSel${i}" onchange="purchaseLines[${i}].productId=this.value;onPurchaseProductChange(${i})" style="width:100%">
           <option value="">Select item…</option>${opts}
         </select>
       </div>
@@ -881,6 +1005,10 @@ function onPurchaseProductChange(i) {
 function updatePurchaseTotal() {
   const total = purchaseLines.reduce((a, l) => a + (Number(l.qty) || 0) * (Number(l.unitCost) || 0), 0);
   document.getElementById('puTotal').textContent = fmt(total);
+  const paidRaw = document.getElementById('puPaid')?.value;
+  const paid = paidRaw === '' || paidRaw == null ? total : Number(paidRaw) || 0;
+  const bal = document.getElementById('puBalance');
+  if (bal) bal.textContent = fmt(Math.max(0, total - paid));
 }
 
 document.getElementById('puPaidBank')?.addEventListener('change', function () {
@@ -904,6 +1032,7 @@ document.getElementById('purchaseForm')?.addEventListener('submit', async (e) =>
       bankName: puBank.value.trim(),
       status: (typeof puStatus !== 'undefined' && puStatus.value) || 'Received',
       expectedDate: (typeof puExpected !== 'undefined' && puExpected.value) || '',
+      amountPaid: puPaid.value === '' ? undefined : Number(puPaid.value),
       items
     });
     closeModal('purchaseModal');
@@ -961,7 +1090,7 @@ async function renderExpenses() {
         <td>${e.description}</td>
         <td><b>${fmt(e.amount)}</b></td>
         <td>${e.paidFromBank ? (e.bankName || 'Yes') : '—'}</td>
-        <td>${e.reference || '—'}</td>
+        <td>${e.reason || e.reference || '—'}</td>
         <td>${e.recordedByName || '—'}</td>
         <td><button class="btn small danger" onclick="deleteExpense('${e._id}')">Delete</button></td>
       </tr>`).join('')
@@ -989,7 +1118,7 @@ document.getElementById('expenseForm')?.addEventListener('submit', async (e) => 
       amount: exAmount.value,
       date: exDate.value,
       description: exDesc.value.trim(),
-      reference: exRef.value.trim(),
+      reason: exReason.value.trim(),
       paidFromBank: exPaidBank.checked,
       bankName: exBank.value.trim()
     });
@@ -1446,6 +1575,7 @@ async function renderAudit() {
   if (from) params.from = from;
   if (to) params.to = to;
   const logs = await api.listAudit(params);
+  const isSuper = currentUser && currentUser.role === 'Supervisor';
   document.getElementById('auditBody').innerHTML = logs.length
     ? logs.map((l) => {
         const when = new Date(l.createdAt).toLocaleString('en-GB', {
@@ -1458,9 +1588,32 @@ async function renderAudit() {
           <td><span class="badge ok">${l.action}</span></td>
           <td>${l.entity}</td>
           <td>${l.summary}</td>
+          ${isSuper ? `<td><button class="btn small danger" onclick="deleteAuditEntry('${l._id}')">Delete</button></td>` : ''}
         </tr>`;
       }).join('')
-    : '<tr><td colspan="6" class="empty">No audit entries yet.</td></tr>';
+    : `<tr><td colspan="${isSuper ? 7 : 6}" class="empty">No audit entries yet.</td></tr>`;
+}
+
+async function deleteAuditEntry(id) {
+  if (!confirm('Delete this audit log entry?')) return;
+  try {
+    await api.deleteAudit(id);
+    toast('Log entry deleted.');
+    await renderAudit();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+async function clearAuditLog() {
+  if (!confirm('Clear the ENTIRE audit log? This cannot be undone.')) return;
+  try {
+    await api.clearAudit();
+    toast('Audit log cleared.');
+    await renderAudit();
+  } catch (err) {
+    toast(err.message, true);
+  }
 }
 
 /* ---------------- Profit & Loss ---------------- */
@@ -1536,7 +1689,7 @@ async function renderPnL() {
 async function renderStaff() {
   const staff = await api.listStaff();
   document.getElementById('staffBody').innerHTML = staff
-    .map((u) => `<tr><td><b>${u.name}</b>${u.id === currentUser.id ? ' <span class="badge ok">You</span>' : ''}</td><td>${u.phone || '—'}</td><td>${u.role}</td><td><button class="btn small secondary" onclick="editStaff('${u.id}')">Edit</button> <button class="btn small danger" onclick="deleteStaff('${u.id}')">Delete</button></td></tr>`)
+    .map((u) => `<tr><td><b>${u.name}</b>${u.id === currentUser.id ? ' <span class="badge ok">You</span>' : ''}</td><td>${u.phone || '—'}</td><td>${u.role}</td><td><button class="btn small secondary" onclick="editStaff('${u.id}')">${u.role === 'Owner' ? 'Manage Login' : 'Edit'}</button>${u.role === 'Owner' || u.id === currentUser.id ? '' : ` <button class="btn small danger" onclick="deleteStaff('${u.id}')">Delete</button>`}</td></tr>`)
     .join('');
 }
 
@@ -1544,8 +1697,21 @@ function openStaffModal() {
   if (guardOwnerAction()) return;
   editingStaffId = null;
   document.getElementById('staffForm').reset();
+  setStaffRoleOptions(null);
   document.getElementById('staffModalTitle').textContent = 'Add Staff';
   document.getElementById('staffModal').classList.add('show');
+}
+
+// Owner accounts keep their role; staff accounts choose Pharmacist or Supervisor
+function setStaffRoleOptions(role) {
+  const sel = document.getElementById('stRole');
+  if (role === 'Owner') {
+    sel.innerHTML = '<option>Owner</option>';
+    sel.disabled = true;
+  } else {
+    sel.innerHTML = '<option>Pharmacist</option><option>Supervisor</option>';
+    sel.disabled = false;
+  }
 }
 
 async function editStaff(id) {
@@ -1553,18 +1719,20 @@ async function editStaff(id) {
   const u = staff.find((x) => x.id === id);
   if (!u) return;
   editingStaffId = id;
+  setStaffRoleOptions(u.role);
   stName.value = u.name;
   if (typeof stPhone !== "undefined") stPhone.value = u.phone || "";
   stRole.value = u.role;
   stPhone.value = u.phone || '';
   stPass.value = '';
-  document.getElementById('staffModalTitle').textContent = 'Edit Staff';
+  document.getElementById('staffModalTitle').textContent = u.role === 'Owner' ? "Manage Owner's Account" : 'Edit Staff';
   document.getElementById('staffModal').classList.add('show');
 }
 
 document.getElementById('staffForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const payload = { name: stName.value.trim(), role: stRole.value, phone: stPhone.value.trim() };
+  const payload = { name: stName.value.trim(), phone: stPhone.value.trim() };
+  if (!stRole.disabled) payload.role = stRole.value;
   if (stPass.value) payload.password = stPass.value;
   try {
     if (editingStaffId) await api.updateStaff(editingStaffId, payload);
@@ -1594,9 +1762,8 @@ function renderProfile() {
   pfName.value = currentUser.name;
   pfPhone.value = currentUser.phone || '';
   pfRole.value = currentUser.role;
-  const locked = isOwner();
-  pfName.disabled = locked;
-  pfPhone.disabled = locked;
+  pfName.disabled = false;
+  pfPhone.disabled = false;
   const url = avatarUrl(currentUser);
   const img = document.getElementById('pfAvatarPreview');
   const fb = document.getElementById('pfAvatarFallback');
@@ -1615,7 +1782,6 @@ function renderProfile() {
 
 document.getElementById('profileForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (guardOwnerAction()) return;
   try {
     const { user } = await api.updateProfile({ name: pfName.value, phone: pfPhone.value });
     currentUser = user;
@@ -1628,7 +1794,6 @@ document.getElementById('profileForm').addEventListener('submit', async (e) => {
 
 document.getElementById('passwordForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (guardOwnerAction()) return;
   if (pfNewPass.value !== pfConfPass.value) return toast('New passwords do not match.', true);
   try {
     await api.changePassword({ currentPassword: pfCurPass.value, newPassword: pfNewPass.value });

@@ -14,7 +14,7 @@
 <title>MARALEX Allied — Pharmaceutical & Medical Inventory</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Playfair+Display:ital,wght@1,500;1,600;1,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css?v=9">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 (function(){try{var t=localStorage.getItem('maralex_theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');else if(t==='light')document.documentElement.setAttribute('data-theme','light');else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
@@ -147,8 +147,10 @@
 <section class="page" id="sales">
 <div class="section-head"><div><h2>Sales / Point of Sale</h2><p>Select inventory items to build a sale, linked to live stock.</p></div></div>
 <div class="pos">
-<div><div class="toolbar"><input class="input" id="posSearch" placeholder="Search inventory..." oninput="renderPOS()"><select class="select" id="posCat" onchange="renderPOS()"><option value="">All categories</option><option>Medicines</option><option>Medical Supplies</option><option>Laboratory</option><option>Equipment</option></select></div><div class="product-grid" id="productGrid"></div></div>
-<div class="panel cart"><h3>Current Sale</h3><div class="field"><label>Patient / Customer</label><input class="input" id="saleCustomer" placeholder="Walk-in Patient" style="width:100%"></div><div id="cart"></div><div class="total"><span>Total</span><span id="cartTotal">Le 0</span></div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn secondary" style="flex:1" onclick="clearCart()">Clear</button><button class="btn primary" style="flex:2" onclick="checkout()">Complete Sale</button></div></div>
+<div><div class="toolbar"><input class="input" id="posSearch" placeholder="Search inventory..." oninput="renderPOS()"><select class="select" id="posCat" onchange="renderPOS()"><option value="">All categories</option><option>Medicines</option><option>Medical Supplies</option><option>Laboratory</option><option>Equipment</option></select><label id="pastSaleDateWrap" style="display:none;align-items:center;gap:6px;font-size:12px;white-space:nowrap" title="Choose an earlier date to record a past sale">Sale Date <input class="input" type="date" id="saleDate"></label></div><div class="product-grid" id="productGrid"></div></div>
+<div class="panel cart"><h3>Current Sale</h3><div class="field"><label>Patient / Customer</label><input class="input" id="saleCustomer" placeholder="Walk-in Patient" style="width:100%"></div><div id="pastSaleBox" style="display:none;border:1px dashed var(--border,#cfd6cf);border-radius:10px;padding:10px;margin:8px 0">
+<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px"><input type="checkbox" id="saleDeductStock" checked style="margin-top:2px"><span>Reduce current stock for this sale<br><span style="color:#667">Untick if your stock quantities already reflect this past sale.</span></span></label>
+</div><div id="cart"></div><div class="total"><span>Total</span><span id="cartTotal">Le 0</span></div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn secondary" style="flex:1" onclick="clearCart()">Clear</button><button class="btn primary" style="flex:2" onclick="checkout()">Complete Sale</button></div></div>
 </div>
 </section>
 
@@ -197,16 +199,18 @@
 </section>
 
 <section class="page" id="stock">
-<div class="section-head"><div><h2>Stock Adjustments</h2><p>Record received stock, damaged items and manual corrections.</p></div><button class="btn primary" onclick="openAdjustModal()">＋ Adjust Stock</button></div>
-<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Item</th><th>Type</th><th>Quantity</th><th>Reason</th><th>Reorder Date</th></tr></thead><tbody id="adjustBody"></tbody></table></div></div>
+<div class="section-head"><div><h2>Stock Adjustments</h2><p>Record received stock, damaged items and manual corrections.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn danger" id="clearAdjustBtn" style="display:none" onclick="clearAdjustments()">🗑 Clear All</button><button class="btn primary" onclick="openAdjustModal()">＋ Adjust Stock</button></div></div>
+<div class="toolbar"><input class="input" id="adjSearch" placeholder="Search item, type or reason..." oninput="filterAdjustments()"></div>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Item</th><th>Type</th><th>Quantity</th><th>Reason</th><th>Reorder Date</th><th id="adjActionTh" style="display:none">Action</th></tr></thead><tbody id="adjustBody"></tbody></table></div></div>
 </section>
 
 
 <section class="page" id="purchases">
 <div class="section-head"><div><h2>Purchases / Goods Received</h2><p>Record stock received from suppliers. Quantities are added to inventory automatically.</p></div>
 <button class="btn primary" onclick="openPurchaseModal()">＋ New Purchase</button></div>
+<div class="toolbar"><input class="input" id="purSearch" placeholder="Search invoice, supplier or item..." oninput="filterPurchases()"></div>
 <div class="panel"><div class="table-wrap"><table class="table">
-<thead><tr><th>Invoice</th><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th><th>Status</th><th>Paid from Bank</th><th>Recorded By</th><th>Action</th></tr></thead>
+<thead><tr><th>Invoice</th><th>Date</th><th>Supplier</th><th>Items</th><th>Total Cost</th><th>Paid</th><th>Balance</th><th>Status</th><th>Paid from Bank</th><th>Recorded By</th><th>Action</th></tr></thead>
 <tbody id="purchaseBody"></tbody>
 </table></div></div>
 </section>
@@ -228,7 +232,7 @@
   </select>
 </div>
 <div class="panel"><div class="table-wrap"><table class="table">
-<thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Bank</th><th>Reference</th><th>Recorded By</th><th>Action</th></tr></thead>
+<thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Bank</th><th>Reason</th><th>Recorded By</th><th>Action</th></tr></thead>
 <tbody id="expenseBody"></tbody>
 </table></div></div>
 </section>
@@ -254,7 +258,7 @@
 </section>
 
 <section class="page" id="audit">
-<div class="section-head"><div><h2>Audit Log</h2><p>Who did what, and when — across the whole system.</p></div></div>
+<div class="section-head"><div><h2>Audit Log</h2><p>Who did what, and when — across the whole system.</p></div><button class="btn danger" id="clearAuditBtn" style="display:none" onclick="clearAuditLog()">🗑 Clear All</button></div>
 <div class="toolbar">
   <select class="select" id="auditEntity" onchange="renderAudit()">
     <option value="">All entities</option>
@@ -271,7 +275,7 @@
   <input class="input" type="date" id="auditTo" onchange="renderAudit()">
 </div>
 <div class="panel"><div class="table-wrap"><table class="table">
-<thead><tr><th>When</th><th>User</th><th>Role</th><th>Action</th><th>Entity</th><th>Summary</th></tr></thead>
+<thead><tr><th>When</th><th>User</th><th>Role</th><th>Action</th><th>Entity</th><th>Summary</th><th id="auditActionTh" style="display:none">Action</th></tr></thead>
 <tbody id="auditBody"></tbody>
 </table></div></div>
 </section>
@@ -359,7 +363,7 @@
 </section>
 
 <section class="page" id="staff">
-<div class="section-head"><div><h2>Manage Staff</h2><p>Create and manage Pharmacist and Supervisor login accounts.</p></div><button class="btn primary" onclick="openStaffModal()">＋ Add Staff</button></div>
+<div class="section-head"><div><h2>Manage Staff</h2><p>Create and manage Pharmacist and Supervisor login accounts, and manage the Owner's phone number and password.</p></div><button class="btn primary" onclick="openStaffModal()">＋ Add Staff</button></div>
 <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Phone (Login)</th><th>Role</th><th>Action</th></tr></thead><tbody id="staffBody"></tbody></table></div></div>
 </section>
 
@@ -525,7 +529,11 @@
         <label style="font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer">
           <input type="checkbox" id="puPaidBank"> Also record as bank withdrawal
         </label>
-        <div style="font-size:12px">Total: <b id="puTotal">Le 0</b></div>
+        <div style="font-size:12px">Total Cost: <b id="puTotal">Le 0</b></div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-top:10px">
+        <div class="field"><label>Amount Paid Now (Le)</label><input class="input" type="number" min="0" step="1" id="puPaid" placeholder="Leave blank if fully paid" oninput="updatePurchaseTotal()"></div>
+        <div class="field"><label>Balance Remaining</label><div style="padding:10px 0;font-size:14px"><b id="puBalance">Le 0</b></div></div>
       </div>
       <div class="field" id="puBankWrap" style="display:none;margin-top:10px">
         <label>Bank Name</label>
@@ -559,7 +567,7 @@
         </div>
         <div class="field"><label>Amount (Le)</label><input class="input" type="number" id="exAmount" min="1" step="1" required></div>
         <div class="field"><label>Date</label><input class="input" type="date" id="exDate" required></div>
-        <div class="field"><label>Reference</label><input class="input" id="exRef" placeholder="Receipt / invoice no."></div>
+        <div class="field"><label>Reason for Expense</label><input class="input" id="exReason" required placeholder="e.g. Generator ran out of fuel"></div>
         <div class="field" style="grid-column:1/-1"><label>Description</label><input class="input" id="exDesc" required placeholder="e.g. Electricity bill for September"></div>
       </div>
       <label style="font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:12px">
@@ -699,8 +707,8 @@
 </div>
 <div id="toastHost"></div>
 
-<script src="js/api.js"></script>
-<script src="js/app.js"></script>
+<script src="js/api.js?v=9"></script>
+<script src="js/app.js?v=9"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
