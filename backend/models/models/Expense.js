@@ -22,7 +22,8 @@ const expenseSchema = new mongoose.Schema(
     description: { type: String, required: true, trim: true },
     paidFromBank: { type: Boolean, default: false },
     bankName: { type: String, default: '' },
-    reference: { type: String, default: '' },
+    reason: { type: String, default: '', trim: true }, // why the money was spent
+    reference: { type: String, default: '' }, // legacy field (no longer used)
     recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     recordedByName: { type: String, default: '' }
   },

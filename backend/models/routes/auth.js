@@ -46,11 +46,14 @@ router.get('/me', requireAuth, (req, res) => {
 });
 
 // PUT /api/auth/profile — update own name/username/phone
-router.put('/profile', requireAuth, requireWrite, async (req, res) => {
+router.put('/profile', requireAuth, async (req, res) => {
   try {
     const { name, phone } = req.body;
     if (phone !== undefined && phone !== null && String(phone).trim()) {
       const normalized = User.normalizePhone(phone);
+      if (!normalized || normalized.replace(/\D/g, '').length < 7) {
+        return res.status(400).json({ message: 'Enter a valid phone number.' });
+      }
       const dupe = await User.findOne({
         _id: { $ne: req.user._id },
         phone: normalized
@@ -67,7 +70,7 @@ router.put('/profile', requireAuth, requireWrite, async (req, res) => {
 });
 
 // PUT /api/auth/password — change own password
-router.put('/password', requireAuth, requireWrite, async (req, res) => {
+router.put('/password', requireAuth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const match = await req.user.comparePassword(currentPassword || '');
@@ -95,7 +98,7 @@ router.delete('/me', requireAuth, requireWrite, async (req, res) => {
 
 
 // POST /api/auth/avatar — upload profile image
-router.post('/avatar', requireAuth, requireWrite, upload.single('avatar'), async (req, res) => {
+router.post('/avatar', requireAuth, upload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'Choose an image file.' });
     req.user.avatar = req.file.filename;

@@ -148,6 +148,7 @@ function applyRoleNav() {
   // Pharmacist cannot add inventory items
   show('addItemBtn', !isPharm);
   // Supervisor-only clean-up tools
+  show('pastSaleBox', isSuper);
   show('clearAuditBtn', isSuper);
   show('auditActionTh', isSuper);
   show('clearAdjustBtn', isSuper);
@@ -566,6 +567,11 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
 /* ---------------- Sales / POS ---------------- */
 
 async function renderPOS() {
+  const sd = document.getElementById('saleDate');
+  if (sd) {
+    sd.max = todayISO();
+    if (!sd.value) sd.value = todayISO();
+  }
   await loadProducts();
   filterPOS();
   document.getElementById('cart').innerHTML = cart.length
@@ -621,13 +627,28 @@ async function checkout() {
   if (!cart.length) return toast('Add at least one item to the sale.', true);
   const customer = document.getElementById('saleCustomer').value.trim() || 'Walk-in Patient';
   try {
-    const sale = await api.checkout({
+    const isSuper = currentUser && currentUser.role === 'Supervisor';
+    const payload = {
       customer,
       items: cart.map((c) => ({ productId: c.productId, qty: c.qty }))
-    });
+    };
+    let isPast = false;
+    if (isSuper) {
+      const d = document.getElementById('saleDate').value || todayISO();
+      const deduct = document.getElementById('saleDeductStock').checked;
+      isPast = d !== todayISO() || !deduct;
+      if (isPast) {
+        payload.date = d;
+        payload.deductStock = deduct;
+        if (!confirm(`Record this sale dated ${d}${deduct ? '' : ' without changing current stock'}?`)) return;
+      }
+    }
+    const sale = await api.checkout(payload);
     cart = [];
     document.getElementById('saleCustomer').value = '';
-    toast(`Sale ${sale.invoice} completed successfully.`);
+    document.getElementById('saleDate').value = todayISO();
+    document.getElementById('saleDeductStock').checked = true;
+    toast(isPast ? `Past sale ${sale.invoice} recorded for ${sale.date}.` : `Sale ${sale.invoice} completed successfully.`);
     await renderPOS();
     await renderDashboard();
   } catch (err) {
