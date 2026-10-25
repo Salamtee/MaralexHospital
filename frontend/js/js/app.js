@@ -237,14 +237,14 @@ async function go(id) {
     return;
   }
   if (id === 'sales' && currentUser.role === 'Owner') {
-    toast('Sales / POS is hidden for Owner accounts. Use Sales Reports to review activity.', true);
+    toast('Record Sale is hidden for Owner accounts. Use Sales Reports to review activity.', true);
     return;
   }
   document.querySelectorAll('.page').forEach((x) => x.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.nav button').forEach((x) => x.classList.toggle('active', x.dataset.page === id));
   document.getElementById('pageTitle').textContent =
-    id === 'sales' ? 'Sales / POS'
+    id === 'sales' ? 'Record Sale'
     : id === 'stock' ? 'Stock Adjustments'
     : id === 'purchases' ? 'Purchases'
     : id === 'expenses' ? 'Expenses'
