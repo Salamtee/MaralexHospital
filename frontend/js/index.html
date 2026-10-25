@@ -14,7 +14,7 @@
 <title>MARALEX Allied — Pharmaceutical & Medical Inventory</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Playfair+Display:ital,wght@1,500;1,600;1,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css?v=9">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 (function(){try{var t=localStorage.getItem('maralex_theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');else if(t==='light')document.documentElement.setAttribute('data-theme','light');else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
@@ -147,8 +147,10 @@
 <section class="page" id="sales">
 <div class="section-head"><div><h2>Sales / Point of Sale</h2><p>Select inventory items to build a sale, linked to live stock.</p></div></div>
 <div class="pos">
-<div><div class="toolbar"><input class="input" id="posSearch" placeholder="Search inventory..." oninput="renderPOS()"><select class="select" id="posCat" onchange="renderPOS()"><option value="">All categories</option><option>Medicines</option><option>Medical Supplies</option><option>Laboratory</option><option>Equipment</option></select></div><div class="product-grid" id="productGrid"></div></div>
-<div class="panel cart"><h3>Current Sale</h3><div class="field"><label>Patient / Customer</label><input class="input" id="saleCustomer" placeholder="Walk-in Patient" style="width:100%"></div><div id="cart"></div><div class="total"><span>Total</span><span id="cartTotal">Le 0</span></div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn secondary" style="flex:1" onclick="clearCart()">Clear</button><button class="btn primary" style="flex:2" onclick="checkout()">Complete Sale</button></div></div>
+<div><div class="toolbar"><input class="input" id="posSearch" placeholder="Search inventory..." oninput="renderPOS()"><select class="select" id="posCat" onchange="renderPOS()"><option value="">All categories</option><option>Medicines</option><option>Medical Supplies</option><option>Laboratory</option><option>Equipment</option></select><label id="pastSaleDateWrap" style="display:none;align-items:center;gap:6px;font-size:12px;white-space:nowrap" title="Choose an earlier date to record a past sale">Sale Date <input class="input" type="date" id="saleDate"></label></div><div class="product-grid" id="productGrid"></div></div>
+<div class="panel cart"><h3>Current Sale</h3><div class="field"><label>Patient / Customer</label><input class="input" id="saleCustomer" placeholder="Walk-in Patient" style="width:100%"></div><div id="pastSaleBox" style="display:none;border:1px dashed var(--border,#cfd6cf);border-radius:10px;padding:10px;margin:8px 0">
+<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px"><input type="checkbox" id="saleDeductStock" checked style="margin-top:2px"><span>Reduce current stock for this sale<br><span style="color:#667">Untick if your stock quantities already reflect this past sale.</span></span></label>
+</div><div id="cart"></div><div class="total"><span>Total</span><span id="cartTotal">Le 0</span></div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn secondary" style="flex:1" onclick="clearCart()">Clear</button><button class="btn primary" style="flex:2" onclick="checkout()">Complete Sale</button></div></div>
 </div>
 </section>
 
@@ -705,8 +707,8 @@
 </div>
 <div id="toastHost"></div>
 
-<script src="js/api.js"></script>
-<script src="js/app.js"></script>
+<script src="js/api.js?v=9"></script>
+<script src="js/app.js?v=9"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
