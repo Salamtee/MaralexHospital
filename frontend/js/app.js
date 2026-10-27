@@ -131,9 +131,9 @@ async function enterApp() {
 
 function applyRoleNav() {
   const role = currentUser && currentUser.role;
-  const show = (id, yes) => {
+  const show = (id, yes, display) => {
     const el = document.getElementById(id);
-    if (el) el.style.display = yes ? '' : 'none';
+    if (el) el.style.display = yes ? (display || '') : 'none';
   };
   // Pharmacist cannot access finance / audit pages
   const isPharm = role === 'Pharmacist';
@@ -148,6 +148,8 @@ function applyRoleNav() {
   // Pharmacist cannot add inventory items
   show('addItemBtn', !isPharm);
   // Supervisor-only clean-up tools
+  show('pastSaleBox', isSuper);
+  show('pastSaleDateWrap', isSuper, 'flex');
   show('clearAuditBtn', isSuper);
   show('auditActionTh', isSuper);
   show('clearAdjustBtn', isSuper);
@@ -235,14 +237,14 @@ async function go(id) {
     return;
   }
   if (id === 'sales' && currentUser.role === 'Owner') {
-    toast('Sales / POS is hidden for Owner accounts. Use Sales Reports to review activity.', true);
+    toast('Record Sale is hidden for Owner accounts. Use Sales Reports to review activity.', true);
     return;
   }
   document.querySelectorAll('.page').forEach((x) => x.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.nav button').forEach((x) => x.classList.toggle('active', x.dataset.page === id));
   document.getElementById('pageTitle').textContent =
-    id === 'sales' ? 'Sales / POS'
+    id === 'sales' ? 'Record Sale'
     : id === 'stock' ? 'Stock Adjustments'
     : id === 'purchases' ? 'Purchases'
     : id === 'expenses' ? 'Expenses'
@@ -566,6 +568,11 @@ document.getElementById('productForm').addEventListener('submit', async (e) => {
 /* ---------------- Sales / POS ---------------- */
 
 async function renderPOS() {
+  const sd = document.getElementById('saleDate');
+  if (sd) {
+    sd.max = todayISO();
+    if (!sd.value) sd.value = todayISO();
+  }
   await loadProducts();
   filterPOS();
   document.getElementById('cart').innerHTML = cart.length
@@ -621,13 +628,28 @@ async function checkout() {
   if (!cart.length) return toast('Add at least one item to the sale.', true);
   const customer = document.getElementById('saleCustomer').value.trim() || 'Walk-in Patient';
   try {
-    const sale = await api.checkout({
+    const isSuper = currentUser && currentUser.role === 'Supervisor';
+    const payload = {
       customer,
       items: cart.map((c) => ({ productId: c.productId, qty: c.qty }))
-    });
+    };
+    let isPast = false;
+    if (isSuper) {
+      const d = document.getElementById('saleDate').value || todayISO();
+      const deduct = document.getElementById('saleDeductStock').checked;
+      isPast = d !== todayISO() || !deduct;
+      if (isPast) {
+        payload.date = d;
+        payload.deductStock = deduct;
+        if (!confirm(`Record this sale dated ${d}${deduct ? '' : ' without changing current stock'}?`)) return;
+      }
+    }
+    const sale = await api.checkout(payload);
     cart = [];
     document.getElementById('saleCustomer').value = '';
-    toast(`Sale ${sale.invoice} completed successfully.`);
+    document.getElementById('saleDate').value = todayISO();
+    document.getElementById('saleDeductStock').checked = true;
+    toast(isPast ? `Past sale ${sale.invoice} recorded for ${sale.date}.` : `Sale ${sale.invoice} completed successfully.`);
     await renderPOS();
     await renderDashboard();
   } catch (err) {
